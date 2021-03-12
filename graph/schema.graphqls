@@ -1,0 +1,64 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+
+scalar Time
+
+type Balance {
+  id: ID!
+  currency: String!
+  encryption: String!
+  data: String!
+
+  allEntries: [Entry!]
+  latestEntry(currency: String!): Entry
+}
+
+type Entry {
+  id: ID!
+  currency: String!
+  encryption: String!
+  data: String!
+  validAt: Time!
+}
+
+type Query {
+    balances: [Balance!]
+}
+
+input CreateBalanceInput {
+  currency: String!
+  encryption: String!
+  data: String!
+  entries: [EntryInput!]!
+}
+
+input UpdateBalanceInput {
+  balanceId: ID!
+  encryption: String!
+  data: String!
+}
+
+type BalancePayload {
+  balance: Balance
+}
+
+input EntryInput {
+  currency: String!
+  encryption: String!
+  data: String!
+}
+
+input AddEntriesInput {
+  balanceId: ID!
+  entries: [EntryInput!]!
+}
+
+type Mutation {
+  createBalance(params: CreateBalanceInput!): BalancePayload
+  updateBalance(params: UpdateBalanceInput!): BalancePayload
+  removeBalance(balanceId: ID!): BalancePayload
+
+  addEntries(params: AddEntriesInput!): BalancePayload
+  removeEntry(entryId: ID!): BalancePayload
+}

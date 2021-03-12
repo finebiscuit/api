@@ -1,0 +1,5 @@
+FROM golang:1.16-alpine3.13
+
+RUN apk add --update --no-cache gcc make musl-dev
+
+WORKDIR /code

@@ -1,0 +1,47 @@
+package sqldb
+
+import (
+	"context"
+
+	"gorm.io/gorm"
+
+	"github.com/finebiscuit/api/services/accounting"
+	"github.com/finebiscuit/api/services/accounting/balance"
+	"github.com/finebiscuit/api/services/accounting/entry"
+)
+
+type UnitOfWork struct {
+	tx *gorm.DB
+}
+
+func NewUnitOfWork(ctx context.Context, db *gorm.DB) (*UnitOfWork, error) {
+	tx := db.WithContext(ctx).Begin()
+	uow := &UnitOfWork{tx: tx}
+	return uow, tx.Error
+}
+
+func (uow *UnitOfWork) Commit() error {
+	return uow.tx.Commit().Error
+}
+
+func (uow *UnitOfWork) Rollback() error {
+	return uow.tx.Rollback().Error
+}
+
+func (uow *UnitOfWork) Balances() balance.Repository {
+	return &accountingBalancesRepository{db: uow.tx}
+}
+
+func (uow *UnitOfWork) Entries() entry.Repository {
+	return &accountingEntriesRepository{db: uow.tx}
+}
+
+func Accounting(db *gorm.DB) func(context.Context) (accounting.UnitOfWork, accounting.Tx, error) {
+	return func(ctx context.Context) (accounting.UnitOfWork, accounting.Tx, error) {
+		uow, err := NewUnitOfWork(ctx, db)
+		if err != nil {
+			return nil, nil, err
+		}
+		return uow, uow, err
+	}
+}

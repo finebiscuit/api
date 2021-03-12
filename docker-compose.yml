@@ -1,0 +1,18 @@
+version: '3.9'
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+    volumes:
+    - .:/code
+    - go-modules:/go/pkg/mod
+
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_USER=finebiscuit
+      - POSTGRES_PASSWORD=finebiscuit
+
+volumes:
+  go-modules:
