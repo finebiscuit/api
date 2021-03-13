@@ -29,7 +29,7 @@ type Resolver struct {
 
 func NewResolver(cfg *config.Config) (*Resolver, error) {
 	var (
-		accountingSUOW accounting.UnitOfWorkStarter
+		accountingTxFn accounting.TxFn
 	)
 
 	switch cfg.DBType {
@@ -38,7 +38,7 @@ func NewResolver(cfg *config.Config) (*Resolver, error) {
 		if err != nil {
 			return nil, err
 		}
-		accountingSUOW = sqldb.Accounting(db)
+		accountingTxFn = sqldb.Accounting(db)
 
 		if err := sqldb.AutoMigrate(context.Background(), db); err != nil {
 			return nil, err
@@ -48,7 +48,7 @@ func NewResolver(cfg *config.Config) (*Resolver, error) {
 	}
 
 	accountingService := &accounting.Service{
-		StartUnitOfWork: accountingSUOW,
+		Tx: accountingTxFn,
 	}
 
 	resolver := &Resolver{

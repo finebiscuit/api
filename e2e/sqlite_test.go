@@ -19,7 +19,6 @@ func TestSqlite_Accounting(t *testing.T) {
 	cfg := &config.Config{
 		DBType:   "sqlite3",
 		DBSource: "accounting.test.db",
-		JWTKey:   "keyboard-cat",
 	}
 
 	t.Cleanup(func() {

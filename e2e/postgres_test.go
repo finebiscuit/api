@@ -24,7 +24,6 @@ func TestPostgres_Accounting(t *testing.T) {
 	cfg := &config.Config{
 		DBType:   "postgres",
 		DBSource: postgresDSN(dbName),
-		JWTKey:   "keyboard-cat",
 	}
 
 	preparePostgres(t, dbName)
