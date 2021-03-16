@@ -3,8 +3,8 @@ package sqldb
 import (
 	"context"
 	"database/sql"
-	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	"github.com/finebiscuit/api/services/accounting/balance"
@@ -19,39 +19,56 @@ type accountingBalancesRepository struct {
 var _ balance.Repository = &accountingBalancesRepository{}
 
 type accountingBalance struct {
-	ID         balance.ID     `gorm:"size:20;unique;not null;check:length(id) >= 12"`
-	Currency   forex.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
-	Encryption string         `gorm:"not null;check:length(encryption) > 0"`
-	Data       string         `gorm:"not null;check:length(encryption) > 0"`
+	gorm.Model
 
-	CreatedAt time.Time
-	UpdatedAt sql.NullTime
+	Currency forex.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
+	Type     balance.Type
+
+	DisplayName  sql.NullString
+	OfficialName sql.NullString
+	Institution  sql.NullString
+
+	EstimatedMonthlyGrowthRate  decimal.NullDecimal
+	EstimatedMonthlyValueChange decimal.NullDecimal
 }
 
 func (accountingBalance) TableName() string { return "accounting_balances" }
 
 func newAccountingBalance(b *balance.Balance) *accountingBalance {
 	return &accountingBalance{
-		ID:         b.ID,
-		Currency:   b.Currency,
-		Encryption: b.Encryption,
-		Data:       b.Data,
-		CreatedAt:  b.CreatedAt,
-		UpdatedAt:  sql.NullTime{Time: b.UpdatedAt, Valid: !b.UpdatedAt.IsZero()},
+		Model: gorm.Model{
+			ID:        parseID(b.ID),
+			CreatedAt: b.CreatedAt,
+			UpdatedAt: b.UpdatedAt,
+		},
+
+		Currency: b.Currency,
+		Type:     b.Type,
+
+		DisplayName:  sql.NullString{String: b.DisplayName, Valid: b.DisplayName != ""},
+		OfficialName: sql.NullString{String: b.OfficialName, Valid: b.OfficialName != ""},
+		Institution:  sql.NullString{String: b.Institution, Valid: b.Institution != ""},
+
+		EstimatedMonthlyValueChange: decimal.NullDecimal{Decimal: b.EstimatedMonthlyValueChange, Valid: !b.EstimatedMonthlyValueChange.IsZero()},
+		EstimatedMonthlyGrowthRate:  decimal.NullDecimal{Decimal: b.EstimatedMonthlyGrowthRate, Valid: !b.EstimatedMonthlyGrowthRate.IsZero()},
 	}
 }
 
 func (b *accountingBalance) toDomainEntity() *balance.Balance {
 	return &balance.Balance{
-		ID:       b.ID,
+		ID:       balance.ParseID(uintToString(b.ID)),
 		Currency: b.Currency,
-		EncryptedData: util.EncryptedData{
-			Encryption: b.Encryption,
-			Data:       b.Data,
+		Type:     b.Type,
+		Optional: balance.Optional{
+			DisplayName:                 b.DisplayName.String,
+			OfficialName:                b.OfficialName.String,
+			Institution:                 b.Institution.String,
+			EstimatedMonthlyGrowthRate:  b.EstimatedMonthlyGrowthRate.Decimal,
+			EstimatedMonthlyValueChange: b.EstimatedMonthlyValueChange.Decimal,
 		},
 		HasTimestamps: util.HasTimestamps{
 			CreatedAt: b.CreatedAt,
-			UpdatedAt: b.UpdatedAt.Time,
+			UpdatedAt: b.UpdatedAt,
 		},
 	}
 }
@@ -90,9 +107,10 @@ func (r *accountingBalancesRepository) List(ctx context.Context, filter balance.
 
 func (r *accountingBalancesRepository) Create(ctx context.Context, b *balance.Balance) error {
 	ab := newAccountingBalance(b)
-	if res := r.db.WithContext(ctx).Create(ab); res.Error != nil {
+	if res := r.db.WithContext(ctx).Create(&ab); res.Error != nil {
 		return res.Error
 	}
+	b.ID = balance.ParseID(uintToString(ab.ID))
 	return nil
 }
 

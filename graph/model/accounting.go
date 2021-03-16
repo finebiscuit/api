@@ -8,35 +8,37 @@ import (
 )
 
 type Balance struct {
-	ID         string `json:"id"`
-	Currency   string `json:"currency"`
-	Encryption string `json:"encryption"`
-	Data       string `json:"data"`
+	ID           string  `json:"id"`
+	Currency     string  `json:"currency"`
+	Kind         string  `json:"kind"`
+	DisplayName  *string `json:"displayName"`
+	OfficialName *string `json:"officialName"`
+	Institution  *string `json:"institution"`
 }
 
 func NewBalance(b *balance.Balance) *Balance {
 	return &Balance{
-		ID:         b.ID.String(),
-		Currency:   b.Currency.String(),
-		Encryption: b.Encryption,
-		Data:       b.Data,
+		ID:           string(b.ID),
+		Currency:     b.Currency.String(),
+		Kind:         b.Type.String(),
+		DisplayName:  &b.DisplayName,
+		OfficialName: &b.OfficialName,
+		Institution:  &b.Institution,
 	}
 }
 
 type Entry struct {
-	ID         string    `json:"id"`
-	Currency   string    `json:"currency"`
-	Encryption string    `json:"encryption"`
-	Data       string    `json:"data"`
-	ValidAt    time.Time `json:"validAt"`
+	ID       string    `json:"id"`
+	Currency string    `json:"currency"`
+	Value    string    `json:"value"`
+	ValidAt  time.Time `json:"validAt"`
 }
 
 func NewEntry(e *entry.Entry) *Entry {
 	return &Entry{
-		ID:         e.ID.String(),
-		Currency:   e.Currency.String(),
-		Encryption: e.Encryption,
-		Data:       e.Data,
-		ValidAt:    e.ValidAt,
+		ID:       string(e.ID),
+		Currency: e.Currency.String(),
+		Value:    e.Value.String(),
+		ValidAt:  e.ValidAt,
 	}
 }

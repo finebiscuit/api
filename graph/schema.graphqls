@@ -7,8 +7,11 @@ scalar Time
 type Balance {
   id: ID!
   currency: String!
-  encryption: String!
-  data: String!
+  kind: String!
+
+  displayName: String
+  officialName: String
+  institution: String
 
   allEntries: [Entry!]
   latestEntry(currency: String!): Entry
@@ -17,8 +20,7 @@ type Balance {
 type Entry {
   id: ID!
   currency: String!
-  encryption: String!
-  data: String!
+  value: String!
   validAt: Time!
 }
 
@@ -28,37 +30,32 @@ type Query {
 
 input CreateBalanceInput {
   currency: String!
-  encryption: String!
-  data: String!
-  entries: [EntryInput!]!
+  kind: String!
+  value: String!
+  displayName: String
+  officialName: String
+  institution: String
 }
 
-input UpdateBalanceInput {
+input UpdateBalanceInfoInput {
   balanceId: ID!
-  encryption: String!
-  data: String!
+  displayName: String
+  officialName: String
+  institution: String
+}
+
+input UpdateBalanceValueInput {
+  balanceId: ID!
+  value: String!
 }
 
 type BalancePayload {
   balance: Balance
 }
 
-input EntryInput {
-  currency: String!
-  encryption: String!
-  data: String!
-}
-
-input AddEntriesInput {
-  balanceId: ID!
-  entries: [EntryInput!]!
-}
-
 type Mutation {
   createBalance(params: CreateBalanceInput!): BalancePayload
-  updateBalance(params: UpdateBalanceInput!): BalancePayload
   removeBalance(balanceId: ID!): BalancePayload
-
-  addEntries(params: AddEntriesInput!): BalancePayload
-  removeEntry(entryId: ID!): BalancePayload
+  updateBalanceInfo(params: UpdateBalanceInfoInput!): BalancePayload
+  updateBalanceValue(params: UpdateBalanceValueInput!): BalancePayload
 }

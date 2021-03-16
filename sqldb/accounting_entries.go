@@ -2,9 +2,9 @@ package sqldb
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	"github.com/finebiscuit/api/services/accounting/balance"
@@ -20,14 +20,12 @@ type accountingEntriesRepository struct {
 var _ entry.Repository = &accountingEntriesRepository{}
 
 type accountingEntry struct {
-	ID         entry.ID       `gorm:"size:20;unique;not null;check:length(id) >= 12"`
-	BalanceID  balance.ID     `gorm:"size:20;not null;check:length(balance_id) >= 12"`
-	Currency   forex.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
-	Encryption string         `gorm:"not null;check:length(encryption) > 0"`
-	Data       string         `gorm:"not null;check:length(encryption) > 0"`
-	ValidAt    time.Time
-	CreatedAt  time.Time
-	UpdatedAt  sql.NullTime
+	gorm.Model
+
+	BalanceID uint
+	Currency  forex.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
+	Value     decimal.Decimal
+	ValidAt   time.Time
 
 	Balance accountingBalance
 }
@@ -36,30 +34,28 @@ func (accountingEntry) TableName() string { return "accounting_entries" }
 
 func newAccountingEntry(e *entry.Entry) *accountingEntry {
 	return &accountingEntry{
-		ID:         e.ID,
-		BalanceID:  e.BalanceID,
-		Currency:   e.Currency,
-		ValidAt:    e.ValidAt,
-		Encryption: e.Encryption,
-		Data:       e.Data,
-		CreatedAt:  e.CreatedAt,
-		UpdatedAt:  sql.NullTime{Time: e.UpdatedAt, Valid: !e.UpdatedAt.IsZero()},
+		Model: gorm.Model{
+			ID:        parseID(e.ID),
+			CreatedAt: e.CreatedAt,
+			UpdatedAt: e.UpdatedAt,
+		},
+		BalanceID: parseID(e.BalanceID),
+		Currency:  e.Currency,
+		Value:     e.Value,
+		ValidAt:   e.ValidAt,
 	}
 }
 
 func (e *accountingEntry) toDomainEntity() *entry.Entry {
 	return &entry.Entry{
-		ID:        e.ID,
-		BalanceID: e.BalanceID,
+		ID:        entry.ParseID(uintToString(e.ID)),
+		BalanceID: balance.ParseID(uintToString(e.BalanceID)),
 		Currency:  e.Currency,
+		Value:     e.Value,
 		ValidAt:   e.ValidAt,
-		EncryptedData: util.EncryptedData{
-			Encryption: e.Encryption,
-			Data:       e.Data,
-		},
 		HasTimestamps: util.HasTimestamps{
 			CreatedAt: e.CreatedAt,
-			UpdatedAt: e.UpdatedAt.Time,
+			UpdatedAt: e.UpdatedAt,
 		},
 	}
 }
@@ -83,7 +79,7 @@ func (r *accountingEntriesRepository) List(ctx context.Context, filter entry.Fil
 	var aes []*accountingEntry
 
 	q := filterEntry(r.db.WithContext(ctx), filter)
-	if res := q.Find(&aes); res.Error != nil {
+	if res := q.Order("valid_at desc").Find(&aes); res.Error != nil {
 		return nil, res.Error
 	}
 
@@ -96,9 +92,10 @@ func (r *accountingEntriesRepository) List(ctx context.Context, filter entry.Fil
 
 func (r *accountingEntriesRepository) Create(ctx context.Context, e *entry.Entry) error {
 	ae := newAccountingEntry(e)
-	if res := r.db.WithContext(ctx).Create(ae); res.Error != nil {
+	if res := r.db.WithContext(ctx).Create(&ae); res.Error != nil {
 		return res.Error
 	}
+	e.ID = entry.ParseID(uintToString(ae.ID))
 	return nil
 }
 

@@ -3,6 +3,8 @@ FROM golang:1.16-alpine3.13 AS builder
 RUN apk add --update --no-cache gcc make musl-dev
 RUN mkdir -p /app
 
+WORKDIR /src
+
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -10,7 +12,6 @@ ARG version=dev
 ENV VERSION=$version
 
 COPY . /src
-WORKDIR /src
 
 RUN make -B VERSION=$VERSION LDFLAGS='-s -w -extldflags "-static"' BIN=/app/biscuit-api
 

@@ -1,6 +1,8 @@
 package balance
 
 import (
+	"github.com/shopspring/decimal"
+
 	"github.com/finebiscuit/api/services/forex"
 	"github.com/finebiscuit/api/util"
 )
@@ -10,14 +12,26 @@ import (
 type Balance struct {
 	ID       ID
 	Currency forex.Currency
-	util.EncryptedData
+	Type     Type
+
+	Optional
+
 	util.HasTimestamps
 }
 
-func New(currency forex.Currency, ed util.EncryptedData) *Balance {
+type Optional struct {
+	DisplayName  string
+	OfficialName string
+	Institution  string
+
+	EstimatedMonthlyGrowthRate  decimal.Decimal
+	EstimatedMonthlyValueChange decimal.Decimal
+}
+
+func New(currency forex.Currency, typ Type, opt Optional) *Balance {
 	return &Balance{
-		ID:            newID(),
-		Currency:      currency,
-		EncryptedData: ed,
+		Currency: currency,
+		Type:     typ,
+		Optional: opt,
 	}
 }

@@ -10,10 +10,12 @@ import (
 	"github.com/finebiscuit/api/config"
 	"github.com/finebiscuit/api/graph"
 	"github.com/finebiscuit/api/graph/model"
+	"github.com/finebiscuit/api/services/accounting/balance"
+	"github.com/finebiscuit/api/sqldb"
 )
 
 func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
-	resolver, err := graph.NewResolver(cfg)
+	resolver, err := graph.NewResolver(cfg, sqldb.NewBackend())
 	require.NoError(t, err)
 
 	var (
@@ -29,15 +31,35 @@ func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
 
 		t.Run("Success", func(t *testing.T) {
 			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
-				Currency:   "EUR",
-				Encryption: "none",
-				Data:       "type=Cash",
+				Currency:     "EUR",
+				Kind:         balance.CashChecking.String(),
+				Value:        "123.45",
+				DisplayName:  strPtr("Balance"),
+				Institution:  strPtr("Institution"),
+				OfficialName: strPtr("Institution's Balance"),
 			})
 			require.NoError(t, err)
 			require.NotNil(t, res.Balance)
 			assert.Equal(t, "EUR", res.Balance.Currency)
-			assert.Equal(t, "none", res.Balance.Encryption)
-			assert.Equal(t, "type=Cash", res.Balance.Data)
+			assert.Equal(t, "CashChecking", res.Balance.Kind)
+			assert.Equal(t, "Balance", *res.Balance.DisplayName)
+			assert.Equal(t, "Institution", *res.Balance.Institution)
+			assert.Equal(t, "Institution's Balance", *res.Balance.OfficialName)
+		})
+
+		t.Run("SuccessNoOptional", func(t *testing.T) {
+			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
+				Currency: "RUB",
+				Kind:     balance.CashPhysical.String(),
+				Value:    "543.21",
+			})
+			require.NoError(t, err)
+			require.NotNil(t, res.Balance)
+			assert.Equal(t, "RUB", res.Balance.Currency)
+			assert.Equal(t, "CashPhysical", res.Balance.Kind)
+			assert.Empty(t, res.Balance.DisplayName)
+			assert.Empty(t, res.Balance.Institution)
+			assert.Empty(t, res.Balance.OfficialName)
 		})
 	})
 
@@ -45,37 +67,34 @@ func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
 		t.Run("Success", func(t *testing.T) {
 			res, err := resolver.Query().Balances(ctx)
 			require.NoError(t, err)
-			require.Len(t, res, 1)
+			require.Len(t, res, 2)
 
-			b := res[0]
-			assert.Equal(t, "EUR", b.Currency)
-			assert.Equal(t, "none", b.Encryption)
-			assert.Equal(t, "type=Cash", b.Data)
-
-			balanceID = b.ID
+			for _, b := range res {
+				switch b.Currency {
+				case "EUR":
+					assert.Equal(t, "CashChecking", b.Kind)
+					assert.Equal(t, "Balance", *b.DisplayName)
+					assert.Equal(t, "Institution", *b.Institution)
+					assert.Equal(t, "Institution's Balance", *b.OfficialName)
+					balanceID = b.ID
+				case "RUB":
+					assert.Equal(t, "CashPhysical", b.Kind)
+					assert.Empty(t, b.DisplayName)
+					assert.Empty(t, b.Institution)
+					assert.Empty(t, b.OfficialName)
+				}
+			}
 		})
 	})
 
-	t.Run("Mutation_CreateEntries", func(t *testing.T) {
+	t.Run("Mutation_UpdateBalanceValue", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
-			res, err := resolver.Mutation().AddEntries(ctx, model.AddEntriesInput{
+			res, err := resolver.Mutation().UpdateBalanceValue(ctx, model.UpdateBalanceValueInput{
 				BalanceID: balanceID,
-				Entries: []*model.EntryInput{
-					{
-						Currency:   "EUR",
-						Encryption: "none",
-						Data:       "value=123.45",
-					},
-					{
-						Currency:   "USD",
-						Encryption: "none",
-						Data:       "value=234.56",
-					},
-				},
+				Value:     "234.56",
 			})
 			require.NoError(t, err)
 			require.NotNil(t, res.Balance)
-			assert.Equal(t, balanceID, res.Balance.ID)
 		})
 	})
 
@@ -84,15 +103,11 @@ func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
 		require.NoError(t, err)
 		require.Len(t, res, 2)
 
-		for _, e := range res {
-			switch e.Currency {
-			case "EUR":
-				assert.Equal(t, "none", e.Encryption)
-				assert.Equal(t, "value=123.45", e.Data)
-			case "USD":
-				assert.Equal(t, "none", e.Encryption)
-				assert.Equal(t, "value=234.56", e.Data)
-			}
-		}
+		assert.Equal(t, "234.56", res[0].Value)
+		assert.Equal(t, "123.45", res[1].Value)
 	})
+}
+
+func strPtr(s string) *string {
+	return &s
 }

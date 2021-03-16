@@ -14,7 +14,7 @@ type UnitOfWork struct {
 	tx *gorm.DB
 }
 
-func NewUnitOfWork(ctx context.Context, db *gorm.DB) (*UnitOfWork, error) {
+func newUnitOfWork(ctx context.Context, db *gorm.DB) (*UnitOfWork, error) {
 	tx := db.WithContext(ctx).Begin()
 	if tx.Error != nil {
 		return nil, tx.Error
@@ -39,9 +39,9 @@ func (uow *UnitOfWork) Entries() entry.Repository {
 	return &accountingEntriesRepository{db: uow.tx}
 }
 
-func Accounting(db *gorm.DB) accounting.TxFn {
+func (b *Backend) AccountingTxFn() accounting.TxFn {
 	return func(ctx context.Context, fn func(ctx context.Context, uow accounting.UnitOfWork) error) error {
-		uow, err := NewUnitOfWork(ctx, db)
+		uow, err := newUnitOfWork(ctx, b.db)
 		if err != nil {
 			return err
 		}

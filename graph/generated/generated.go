@@ -46,12 +46,14 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	Balance struct {
-		AllEntries  func(childComplexity int) int
-		Currency    func(childComplexity int) int
-		Data        func(childComplexity int) int
-		Encryption  func(childComplexity int) int
-		ID          func(childComplexity int) int
-		LatestEntry func(childComplexity int, currency string) int
+		AllEntries   func(childComplexity int) int
+		Currency     func(childComplexity int) int
+		DisplayName  func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Institution  func(childComplexity int) int
+		Kind         func(childComplexity int) int
+		LatestEntry  func(childComplexity int, currency string) int
+		OfficialName func(childComplexity int) int
 	}
 
 	BalancePayload struct {
@@ -59,19 +61,17 @@ type ComplexityRoot struct {
 	}
 
 	Entry struct {
-		Currency   func(childComplexity int) int
-		Data       func(childComplexity int) int
-		Encryption func(childComplexity int) int
-		ID         func(childComplexity int) int
-		ValidAt    func(childComplexity int) int
+		Currency func(childComplexity int) int
+		ID       func(childComplexity int) int
+		ValidAt  func(childComplexity int) int
+		Value    func(childComplexity int) int
 	}
 
 	Mutation struct {
-		AddEntries    func(childComplexity int, params model.AddEntriesInput) int
-		CreateBalance func(childComplexity int, params model.CreateBalanceInput) int
-		RemoveBalance func(childComplexity int, balanceID string) int
-		RemoveEntry   func(childComplexity int, entryID string) int
-		UpdateBalance func(childComplexity int, params model.UpdateBalanceInput) int
+		CreateBalance      func(childComplexity int, params model.CreateBalanceInput) int
+		RemoveBalance      func(childComplexity int, balanceID string) int
+		UpdateBalanceInfo  func(childComplexity int, params model.UpdateBalanceInfoInput) int
+		UpdateBalanceValue func(childComplexity int, params model.UpdateBalanceValueInput) int
 	}
 
 	Query struct {
@@ -85,10 +85,9 @@ type BalanceResolver interface {
 }
 type MutationResolver interface {
 	CreateBalance(ctx context.Context, params model.CreateBalanceInput) (*model.BalancePayload, error)
-	UpdateBalance(ctx context.Context, params model.UpdateBalanceInput) (*model.BalancePayload, error)
 	RemoveBalance(ctx context.Context, balanceID string) (*model.BalancePayload, error)
-	AddEntries(ctx context.Context, params model.AddEntriesInput) (*model.BalancePayload, error)
-	RemoveEntry(ctx context.Context, entryID string) (*model.BalancePayload, error)
+	UpdateBalanceInfo(ctx context.Context, params model.UpdateBalanceInfoInput) (*model.BalancePayload, error)
+	UpdateBalanceValue(ctx context.Context, params model.UpdateBalanceValueInput) (*model.BalancePayload, error)
 }
 type QueryResolver interface {
 	Balances(ctx context.Context) ([]*model.Balance, error)
@@ -123,19 +122,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Balance.Currency(childComplexity), true
 
-	case "Balance.data":
-		if e.complexity.Balance.Data == nil {
+	case "Balance.displayName":
+		if e.complexity.Balance.DisplayName == nil {
 			break
 		}
 
-		return e.complexity.Balance.Data(childComplexity), true
-
-	case "Balance.encryption":
-		if e.complexity.Balance.Encryption == nil {
-			break
-		}
-
-		return e.complexity.Balance.Encryption(childComplexity), true
+		return e.complexity.Balance.DisplayName(childComplexity), true
 
 	case "Balance.id":
 		if e.complexity.Balance.ID == nil {
@@ -143,6 +135,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Balance.ID(childComplexity), true
+
+	case "Balance.institution":
+		if e.complexity.Balance.Institution == nil {
+			break
+		}
+
+		return e.complexity.Balance.Institution(childComplexity), true
+
+	case "Balance.kind":
+		if e.complexity.Balance.Kind == nil {
+			break
+		}
+
+		return e.complexity.Balance.Kind(childComplexity), true
 
 	case "Balance.latestEntry":
 		if e.complexity.Balance.LatestEntry == nil {
@@ -155,6 +161,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Balance.LatestEntry(childComplexity, args["currency"].(string)), true
+
+	case "Balance.officialName":
+		if e.complexity.Balance.OfficialName == nil {
+			break
+		}
+
+		return e.complexity.Balance.OfficialName(childComplexity), true
 
 	case "BalancePayload.balance":
 		if e.complexity.BalancePayload.Balance == nil {
@@ -170,20 +183,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Entry.Currency(childComplexity), true
 
-	case "Entry.data":
-		if e.complexity.Entry.Data == nil {
-			break
-		}
-
-		return e.complexity.Entry.Data(childComplexity), true
-
-	case "Entry.encryption":
-		if e.complexity.Entry.Encryption == nil {
-			break
-		}
-
-		return e.complexity.Entry.Encryption(childComplexity), true
-
 	case "Entry.id":
 		if e.complexity.Entry.ID == nil {
 			break
@@ -198,17 +197,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Entry.ValidAt(childComplexity), true
 
-	case "Mutation.addEntries":
-		if e.complexity.Mutation.AddEntries == nil {
+	case "Entry.value":
+		if e.complexity.Entry.Value == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_addEntries_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.AddEntries(childComplexity, args["params"].(model.AddEntriesInput)), true
+		return e.complexity.Entry.Value(childComplexity), true
 
 	case "Mutation.createBalance":
 		if e.complexity.Mutation.CreateBalance == nil {
@@ -234,29 +228,29 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RemoveBalance(childComplexity, args["balanceId"].(string)), true
 
-	case "Mutation.removeEntry":
-		if e.complexity.Mutation.RemoveEntry == nil {
+	case "Mutation.updateBalanceInfo":
+		if e.complexity.Mutation.UpdateBalanceInfo == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_removeEntry_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_updateBalanceInfo_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveEntry(childComplexity, args["entryId"].(string)), true
+		return e.complexity.Mutation.UpdateBalanceInfo(childComplexity, args["params"].(model.UpdateBalanceInfoInput)), true
 
-	case "Mutation.updateBalance":
-		if e.complexity.Mutation.UpdateBalance == nil {
+	case "Mutation.updateBalanceValue":
+		if e.complexity.Mutation.UpdateBalanceValue == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_updateBalance_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_updateBalanceValue_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateBalance(childComplexity, args["params"].(model.UpdateBalanceInput)), true
+		return e.complexity.Mutation.UpdateBalanceValue(childComplexity, args["params"].(model.UpdateBalanceValueInput)), true
 
 	case "Query.balances":
 		if e.complexity.Query.Balances == nil {
@@ -338,8 +332,11 @@ scalar Time
 type Balance {
   id: ID!
   currency: String!
-  encryption: String!
-  data: String!
+  kind: String!
+
+  displayName: String
+  officialName: String
+  institution: String
 
   allEntries: [Entry!]
   latestEntry(currency: String!): Entry
@@ -348,8 +345,7 @@ type Balance {
 type Entry {
   id: ID!
   currency: String!
-  encryption: String!
-  data: String!
+  value: String!
   validAt: Time!
 }
 
@@ -359,39 +355,34 @@ type Query {
 
 input CreateBalanceInput {
   currency: String!
-  encryption: String!
-  data: String!
-  entries: [EntryInput!]!
+  kind: String!
+  value: String!
+  displayName: String
+  officialName: String
+  institution: String
 }
 
-input UpdateBalanceInput {
+input UpdateBalanceInfoInput {
   balanceId: ID!
-  encryption: String!
-  data: String!
+  displayName: String
+  officialName: String
+  institution: String
+}
+
+input UpdateBalanceValueInput {
+  balanceId: ID!
+  value: String!
 }
 
 type BalancePayload {
   balance: Balance
 }
 
-input EntryInput {
-  currency: String!
-  encryption: String!
-  data: String!
-}
-
-input AddEntriesInput {
-  balanceId: ID!
-  entries: [EntryInput!]!
-}
-
 type Mutation {
   createBalance(params: CreateBalanceInput!): BalancePayload
-  updateBalance(params: UpdateBalanceInput!): BalancePayload
   removeBalance(balanceId: ID!): BalancePayload
-
-  addEntries(params: AddEntriesInput!): BalancePayload
-  removeEntry(entryId: ID!): BalancePayload
+  updateBalanceInfo(params: UpdateBalanceInfoInput!): BalancePayload
+  updateBalanceValue(params: UpdateBalanceValueInput!): BalancePayload
 }`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -415,28 +406,13 @@ func (ec *executionContext) field_Balance_latestEntry_args(ctx context.Context, 
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_addEntries_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 model.AddEntriesInput
-	if tmp, ok := rawArgs["params"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("params"))
-		arg0, err = ec.unmarshalNAddEntriesInput2githubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐAddEntriesInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["params"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Mutation_createBalance_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 model.CreateBalanceInput
 	if tmp, ok := rawArgs["params"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("params"))
-		arg0, err = ec.unmarshalNCreateBalanceInput2githubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐCreateBalanceInput(ctx, tmp)
+		arg0, err = ec.unmarshalNCreateBalanceInput2githubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐCreateBalanceInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -460,28 +436,28 @@ func (ec *executionContext) field_Mutation_removeBalance_args(ctx context.Contex
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_removeEntry_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_updateBalanceInfo_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["entryId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("entryId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+	var arg0 model.UpdateBalanceInfoInput
+	if tmp, ok := rawArgs["params"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("params"))
+		arg0, err = ec.unmarshalNUpdateBalanceInfoInput2githubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐUpdateBalanceInfoInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["entryId"] = arg0
+	args["params"] = arg0
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_updateBalance_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_updateBalanceValue_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.UpdateBalanceInput
+	var arg0 model.UpdateBalanceValueInput
 	if tmp, ok := rawArgs["params"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("params"))
-		arg0, err = ec.unmarshalNUpdateBalanceInput2githubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐUpdateBalanceInput(ctx, tmp)
+		arg0, err = ec.unmarshalNUpdateBalanceValueInput2githubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐUpdateBalanceValueInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -613,7 +589,7 @@ func (ec *executionContext) _Balance_currency(ctx context.Context, field graphql
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Balance_encryption(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+func (ec *executionContext) _Balance_kind(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -631,7 +607,7 @@ func (ec *executionContext) _Balance_encryption(ctx context.Context, field graph
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Encryption, nil
+		return obj.Kind, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -648,7 +624,7 @@ func (ec *executionContext) _Balance_encryption(ctx context.Context, field graph
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Balance_data(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+func (ec *executionContext) _Balance_displayName(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -666,21 +642,82 @@ func (ec *executionContext) _Balance_data(ctx context.Context, field graphql.Col
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Data, nil
+		return obj.DisplayName, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Balance_officialName(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Balance",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OfficialName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Balance_institution(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Balance",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Institution, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Balance_allEntries(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
@@ -712,7 +749,7 @@ func (ec *executionContext) _Balance_allEntries(ctx context.Context, field graph
 	}
 	res := resTmp.([]*model.Entry)
 	fc.Result = res
-	return ec.marshalOEntry2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntryᚄ(ctx, field.Selections, res)
+	return ec.marshalOEntry2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐEntryᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Balance_latestEntry(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
@@ -751,7 +788,7 @@ func (ec *executionContext) _Balance_latestEntry(ctx context.Context, field grap
 	}
 	res := resTmp.(*model.Entry)
 	fc.Result = res
-	return ec.marshalOEntry2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntry(ctx, field.Selections, res)
+	return ec.marshalOEntry2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐEntry(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _BalancePayload_balance(ctx context.Context, field graphql.CollectedField, obj *model.BalancePayload) (ret graphql.Marshaler) {
@@ -783,7 +820,7 @@ func (ec *executionContext) _BalancePayload_balance(ctx context.Context, field g
 	}
 	res := resTmp.(*model.Balance)
 	fc.Result = res
-	return ec.marshalOBalance2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalance(ctx, field.Selections, res)
+	return ec.marshalOBalance2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalance(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Entry_id(ctx context.Context, field graphql.CollectedField, obj *model.Entry) (ret graphql.Marshaler) {
@@ -856,7 +893,7 @@ func (ec *executionContext) _Entry_currency(ctx context.Context, field graphql.C
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Entry_encryption(ctx context.Context, field graphql.CollectedField, obj *model.Entry) (ret graphql.Marshaler) {
+func (ec *executionContext) _Entry_value(ctx context.Context, field graphql.CollectedField, obj *model.Entry) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -874,42 +911,7 @@ func (ec *executionContext) _Entry_encryption(ctx context.Context, field graphql
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Encryption, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Entry_data(ctx context.Context, field graphql.CollectedField, obj *model.Entry) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Entry",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Data, nil
+		return obj.Value, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -997,46 +999,7 @@ func (ec *executionContext) _Mutation_createBalance(ctx context.Context, field g
 	}
 	res := resTmp.(*model.BalancePayload)
 	fc.Result = res
-	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Mutation_updateBalance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_updateBalance_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UpdateBalance(rctx, args["params"].(model.UpdateBalanceInput))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.BalancePayload)
-	fc.Result = res
-	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
+	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_removeBalance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1075,10 +1038,10 @@ func (ec *executionContext) _Mutation_removeBalance(ctx context.Context, field g
 	}
 	res := resTmp.(*model.BalancePayload)
 	fc.Result = res
-	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
+	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_addEntries(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_updateBalanceInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1095,7 +1058,7 @@ func (ec *executionContext) _Mutation_addEntries(ctx context.Context, field grap
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_addEntries_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_updateBalanceInfo_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -1103,7 +1066,7 @@ func (ec *executionContext) _Mutation_addEntries(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().AddEntries(rctx, args["params"].(model.AddEntriesInput))
+		return ec.resolvers.Mutation().UpdateBalanceInfo(rctx, args["params"].(model.UpdateBalanceInfoInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1114,10 +1077,10 @@ func (ec *executionContext) _Mutation_addEntries(ctx context.Context, field grap
 	}
 	res := resTmp.(*model.BalancePayload)
 	fc.Result = res
-	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
+	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_removeEntry(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_updateBalanceValue(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1134,7 +1097,7 @@ func (ec *executionContext) _Mutation_removeEntry(ctx context.Context, field gra
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_removeEntry_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_updateBalanceValue_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -1142,7 +1105,7 @@ func (ec *executionContext) _Mutation_removeEntry(ctx context.Context, field gra
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().RemoveEntry(rctx, args["entryId"].(string))
+		return ec.resolvers.Mutation().UpdateBalanceValue(rctx, args["params"].(model.UpdateBalanceValueInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1153,7 +1116,7 @@ func (ec *executionContext) _Mutation_removeEntry(ctx context.Context, field gra
 	}
 	res := resTmp.(*model.BalancePayload)
 	fc.Result = res
-	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
+	return ec.marshalOBalancePayload2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalancePayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_balances(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1185,7 +1148,7 @@ func (ec *executionContext) _Query_balances(ctx context.Context, field graphql.C
 	}
 	res := resTmp.([]*model.Balance)
 	fc.Result = res
-	return ec.marshalOBalance2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalanceᚄ(ctx, field.Selections, res)
+	return ec.marshalOBalance2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -2346,34 +2309,6 @@ func (ec *executionContext) ___Type_ofType(ctx context.Context, field graphql.Co
 
 // region    **************************** input.gotpl *****************************
 
-func (ec *executionContext) unmarshalInputAddEntriesInput(ctx context.Context, obj interface{}) (model.AddEntriesInput, error) {
-	var it model.AddEntriesInput
-	var asMap = obj.(map[string]interface{})
-
-	for k, v := range asMap {
-		switch k {
-		case "balanceId":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("balanceId"))
-			it.BalanceID, err = ec.unmarshalNID2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "entries":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("entries"))
-			it.Entries, err = ec.unmarshalNEntryInput2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntryInputᚄ(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputCreateBalanceInput(ctx context.Context, obj interface{}) (model.CreateBalanceInput, error) {
 	var it model.CreateBalanceInput
 	var asMap = obj.(map[string]interface{})
@@ -2388,63 +2323,43 @@ func (ec *executionContext) unmarshalInputCreateBalanceInput(ctx context.Context
 			if err != nil {
 				return it, err
 			}
-		case "encryption":
+		case "kind":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryption"))
-			it.Encryption, err = ec.unmarshalNString2string(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("kind"))
+			it.Kind, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-		case "data":
+		case "value":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("data"))
-			it.Data, err = ec.unmarshalNString2string(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("value"))
+			it.Value, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-		case "entries":
+		case "displayName":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("entries"))
-			it.Entries, err = ec.unmarshalNEntryInput2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntryInputᚄ(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("displayName"))
+			it.DisplayName, err = ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-		}
-	}
-
-	return it, nil
-}
-
-func (ec *executionContext) unmarshalInputEntryInput(ctx context.Context, obj interface{}) (model.EntryInput, error) {
-	var it model.EntryInput
-	var asMap = obj.(map[string]interface{})
-
-	for k, v := range asMap {
-		switch k {
-		case "currency":
+		case "officialName":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
-			it.Currency, err = ec.unmarshalNString2string(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("officialName"))
+			it.OfficialName, err = ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-		case "encryption":
+		case "institution":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryption"))
-			it.Encryption, err = ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "data":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("data"))
-			it.Data, err = ec.unmarshalNString2string(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("institution"))
+			it.Institution, err = ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2454,8 +2369,8 @@ func (ec *executionContext) unmarshalInputEntryInput(ctx context.Context, obj in
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputUpdateBalanceInput(ctx context.Context, obj interface{}) (model.UpdateBalanceInput, error) {
-	var it model.UpdateBalanceInput
+func (ec *executionContext) unmarshalInputUpdateBalanceInfoInput(ctx context.Context, obj interface{}) (model.UpdateBalanceInfoInput, error) {
+	var it model.UpdateBalanceInfoInput
 	var asMap = obj.(map[string]interface{})
 
 	for k, v := range asMap {
@@ -2468,19 +2383,55 @@ func (ec *executionContext) unmarshalInputUpdateBalanceInput(ctx context.Context
 			if err != nil {
 				return it, err
 			}
-		case "encryption":
+		case "displayName":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryption"))
-			it.Encryption, err = ec.unmarshalNString2string(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("displayName"))
+			it.DisplayName, err = ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-		case "data":
+		case "officialName":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("data"))
-			it.Data, err = ec.unmarshalNString2string(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("officialName"))
+			it.OfficialName, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "institution":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("institution"))
+			it.Institution, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateBalanceValueInput(ctx context.Context, obj interface{}) (model.UpdateBalanceValueInput, error) {
+	var it model.UpdateBalanceValueInput
+	var asMap = obj.(map[string]interface{})
+
+	for k, v := range asMap {
+		switch k {
+		case "balanceId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("balanceId"))
+			it.BalanceID, err = ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "value":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("value"))
+			it.Value, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2519,16 +2470,17 @@ func (ec *executionContext) _Balance(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		case "encryption":
-			out.Values[i] = ec._Balance_encryption(ctx, field, obj)
+		case "kind":
+			out.Values[i] = ec._Balance_kind(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		case "data":
-			out.Values[i] = ec._Balance_data(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+		case "displayName":
+			out.Values[i] = ec._Balance_displayName(ctx, field, obj)
+		case "officialName":
+			out.Values[i] = ec._Balance_officialName(ctx, field, obj)
+		case "institution":
+			out.Values[i] = ec._Balance_institution(ctx, field, obj)
 		case "allEntries":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -2607,13 +2559,8 @@ func (ec *executionContext) _Entry(ctx context.Context, sel ast.SelectionSet, ob
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "encryption":
-			out.Values[i] = ec._Entry_encryption(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "data":
-			out.Values[i] = ec._Entry_data(ctx, field, obj)
+		case "value":
+			out.Values[i] = ec._Entry_value(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -2650,14 +2597,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = graphql.MarshalString("Mutation")
 		case "createBalance":
 			out.Values[i] = ec._Mutation_createBalance(ctx, field)
-		case "updateBalance":
-			out.Values[i] = ec._Mutation_updateBalance(ctx, field)
 		case "removeBalance":
 			out.Values[i] = ec._Mutation_removeBalance(ctx, field)
-		case "addEntries":
-			out.Values[i] = ec._Mutation_addEntries(ctx, field)
-		case "removeEntry":
-			out.Values[i] = ec._Mutation_removeEntry(ctx, field)
+		case "updateBalanceInfo":
+			out.Values[i] = ec._Mutation_updateBalanceInfo(ctx, field)
+		case "updateBalanceValue":
+			out.Values[i] = ec._Mutation_updateBalanceValue(ctx, field)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -2955,12 +2900,7 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) unmarshalNAddEntriesInput2githubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐAddEntriesInput(ctx context.Context, v interface{}) (model.AddEntriesInput, error) {
-	res, err := ec.unmarshalInputAddEntriesInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNBalance2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalance(ctx context.Context, sel ast.SelectionSet, v *model.Balance) graphql.Marshaler {
+func (ec *executionContext) marshalNBalance2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalance(ctx context.Context, sel ast.SelectionSet, v *model.Balance) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -2985,12 +2925,12 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalNCreateBalanceInput2githubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐCreateBalanceInput(ctx context.Context, v interface{}) (model.CreateBalanceInput, error) {
+func (ec *executionContext) unmarshalNCreateBalanceInput2githubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐCreateBalanceInput(ctx context.Context, v interface{}) (model.CreateBalanceInput, error) {
 	res, err := ec.unmarshalInputCreateBalanceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNEntry2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntry(ctx context.Context, sel ast.SelectionSet, v *model.Entry) graphql.Marshaler {
+func (ec *executionContext) marshalNEntry2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐEntry(ctx context.Context, sel ast.SelectionSet, v *model.Entry) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -2998,32 +2938,6 @@ func (ec *executionContext) marshalNEntry2ᚖgithubᚗcomᚋpatrislavᚋbiscuit�
 		return graphql.Null
 	}
 	return ec._Entry(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalNEntryInput2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntryInputᚄ(ctx context.Context, v interface{}) ([]*model.EntryInput, error) {
-	var vSlice []interface{}
-	if v != nil {
-		if tmp1, ok := v.([]interface{}); ok {
-			vSlice = tmp1
-		} else {
-			vSlice = []interface{}{v}
-		}
-	}
-	var err error
-	res := make([]*model.EntryInput, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNEntryInput2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntryInput(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) unmarshalNEntryInput2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntryInput(ctx context.Context, v interface{}) (*model.EntryInput, error) {
-	res, err := ec.unmarshalInputEntryInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
@@ -3071,8 +2985,13 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 	return res
 }
 
-func (ec *executionContext) unmarshalNUpdateBalanceInput2githubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐUpdateBalanceInput(ctx context.Context, v interface{}) (model.UpdateBalanceInput, error) {
-	res, err := ec.unmarshalInputUpdateBalanceInput(ctx, v)
+func (ec *executionContext) unmarshalNUpdateBalanceInfoInput2githubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐUpdateBalanceInfoInput(ctx context.Context, v interface{}) (model.UpdateBalanceInfoInput, error) {
+	res, err := ec.unmarshalInputUpdateBalanceInfoInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateBalanceValueInput2githubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐUpdateBalanceValueInput(ctx context.Context, v interface{}) (model.UpdateBalanceValueInput, error) {
+	res, err := ec.unmarshalInputUpdateBalanceValueInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -3305,7 +3224,7 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
-func (ec *executionContext) marshalOBalance2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalanceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Balance) graphql.Marshaler {
+func (ec *executionContext) marshalOBalance2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Balance) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -3332,7 +3251,7 @@ func (ec *executionContext) marshalOBalance2ᚕᚖgithubᚗcomᚋpatrislavᚋbis
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNBalance2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalance(ctx, sel, v[i])
+			ret[i] = ec.marshalNBalance2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalance(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3345,14 +3264,14 @@ func (ec *executionContext) marshalOBalance2ᚕᚖgithubᚗcomᚋpatrislavᚋbis
 	return ret
 }
 
-func (ec *executionContext) marshalOBalance2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalance(ctx context.Context, sel ast.SelectionSet, v *model.Balance) graphql.Marshaler {
+func (ec *executionContext) marshalOBalance2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalance(ctx context.Context, sel ast.SelectionSet, v *model.Balance) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Balance(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOBalancePayload2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐBalancePayload(ctx context.Context, sel ast.SelectionSet, v *model.BalancePayload) graphql.Marshaler {
+func (ec *executionContext) marshalOBalancePayload2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalancePayload(ctx context.Context, sel ast.SelectionSet, v *model.BalancePayload) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -3383,7 +3302,7 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return graphql.MarshalBoolean(*v)
 }
 
-func (ec *executionContext) marshalOEntry2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Entry) graphql.Marshaler {
+func (ec *executionContext) marshalOEntry2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐEntryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Entry) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -3410,7 +3329,7 @@ func (ec *executionContext) marshalOEntry2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscu
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNEntry2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntry(ctx, sel, v[i])
+			ret[i] = ec.marshalNEntry2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐEntry(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3423,7 +3342,7 @@ func (ec *executionContext) marshalOEntry2ᚕᚖgithubᚗcomᚋpatrislavᚋbiscu
 	return ret
 }
 
-func (ec *executionContext) marshalOEntry2ᚖgithubᚗcomᚋpatrislavᚋbiscuitᚋgraphᚋmodelᚐEntry(ctx context.Context, sel ast.SelectionSet, v *model.Entry) graphql.Marshaler {
+func (ec *executionContext) marshalOEntry2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐEntry(ctx context.Context, sel ast.SelectionSet, v *model.Entry) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

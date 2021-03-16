@@ -29,6 +29,10 @@ test:
 postgres-up:
 	@$(DOCKERCOMPOSE) up -d postgres
 
+.PHONY: down
+down:
+	@$(DOCKERCOMPOSE) down
+
 .PHONY: e2e
 e2e: e2e-sqlite e2e-postgres
 

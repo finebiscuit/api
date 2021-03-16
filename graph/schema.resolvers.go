@@ -13,7 +13,7 @@ import (
 	"github.com/finebiscuit/api/services/accounting/balance"
 	"github.com/finebiscuit/api/services/accounting/entry"
 	"github.com/finebiscuit/api/services/forex"
-	"github.com/finebiscuit/api/util"
+	"github.com/shopspring/decimal"
 )
 
 func (r *balanceResolver) AllEntries(ctx context.Context, obj *model.Balance) ([]*model.Entry, error) {
@@ -41,59 +41,62 @@ func (r *balanceResolver) LatestEntry(ctx context.Context, obj *model.Balance, c
 
 func (r *mutationResolver) CreateBalance(ctx context.Context, params model.CreateBalanceInput) (*model.BalancePayload, error) {
 	currency := forex.Currency(params.Currency)
-	b := balance.New(currency, util.EncryptedData{
-		Encryption: params.Encryption,
-		Data:       params.Data,
-	})
-
-	es := make([]*entry.Entry, 0, len(params.Entries))
-	for _, e := range params.Entries {
-		cur := forex.Currency(params.Currency)
-		es = append(es, entry.New(b.ID, cur, time.Now(), util.EncryptedData{
-			Encryption: e.Encryption,
-			Data:       e.Data,
-		}))
+	typ, err := balance.TypeString(params.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("invalid type: %q", params.Kind)
 	}
 
-	if err := r.Accounting.CreateBalance(ctx, b, es); err != nil {
+	val, err := decimal.NewFromString(params.Value)
+	if err != nil {
+		return nil, fmt.Errorf("invalid value: %q", params.Value)
+	}
+
+	opt := balance.Optional{}
+	if params.DisplayName != nil {
+		opt.DisplayName = *params.DisplayName
+	}
+	if params.OfficialName != nil {
+		opt.OfficialName = *params.OfficialName
+	}
+	if params.Institution != nil {
+		opt.Institution = *params.Institution
+	}
+
+	b := balance.New(currency, typ, opt)
+	e := entry.New(balance.NoID, currency, val, time.Now())
+
+	if err := r.Accounting.CreateBalance(ctx, b, []*entry.Entry{e}); err != nil {
 		return nil, err
 	}
 
 	return &model.BalancePayload{Balance: model.NewBalance(b)}, nil
-}
-
-func (r *mutationResolver) UpdateBalance(ctx context.Context, params model.UpdateBalanceInput) (*model.BalancePayload, error) {
-	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *mutationResolver) RemoveBalance(ctx context.Context, balanceID string) (*model.BalancePayload, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) AddEntries(ctx context.Context, params model.AddEntriesInput) (*model.BalancePayload, error) {
+func (r *mutationResolver) UpdateBalanceInfo(ctx context.Context, params model.UpdateBalanceInfoInput) (*model.BalancePayload, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *mutationResolver) UpdateBalanceValue(ctx context.Context, params model.UpdateBalanceValueInput) (*model.BalancePayload, error) {
 	b, err := r.Accounting.FindBalance(ctx, balance.ParseID(params.BalanceID), balance.Filter{})
 	if err != nil {
 		return nil, err
 	}
 
-	es := make([]*entry.Entry, 0, len(params.Entries))
-	for _, e := range params.Entries {
-		cur := forex.Currency(e.Currency)
-		es = append(es, entry.New(b.ID, cur, time.Now(), util.EncryptedData{
-			Encryption: e.Encryption,
-			Data:       e.Data,
-		}))
+	val, err := decimal.NewFromString(params.Value)
+	if err != nil {
+		return nil, fmt.Errorf("invalid value: %q", params.Value)
 	}
 
-	if err := r.Accounting.AddEntries(ctx, es); err != nil {
+	e := entry.New(b.ID, b.Currency, val, time.Now())
+	if err := r.Accounting.AddEntries(ctx, []*entry.Entry{e}); err != nil {
 		return nil, err
 	}
 
 	return &model.BalancePayload{Balance: model.NewBalance(b)}, nil
-}
-
-func (r *mutationResolver) RemoveEntry(ctx context.Context, entryID string) (*model.BalancePayload, error) {
-	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *queryResolver) Balances(ctx context.Context) ([]*model.Balance, error) {

@@ -2,30 +2,27 @@
 
 package model
 
-type AddEntriesInput struct {
-	BalanceID string        `json:"balanceId"`
-	Entries   []*EntryInput `json:"entries"`
-}
-
 type BalancePayload struct {
 	Balance *Balance `json:"balance"`
 }
 
 type CreateBalanceInput struct {
-	Currency   string        `json:"currency"`
-	Encryption string        `json:"encryption"`
-	Data       string        `json:"data"`
-	Entries    []*EntryInput `json:"entries"`
+	Currency     string  `json:"currency"`
+	Kind         string  `json:"kind"`
+	Value        string  `json:"value"`
+	DisplayName  *string `json:"displayName"`
+	OfficialName *string `json:"officialName"`
+	Institution  *string `json:"institution"`
 }
 
-type EntryInput struct {
-	Currency   string `json:"currency"`
-	Encryption string `json:"encryption"`
-	Data       string `json:"data"`
+type UpdateBalanceInfoInput struct {
+	BalanceID    string  `json:"balanceId"`
+	DisplayName  *string `json:"displayName"`
+	OfficialName *string `json:"officialName"`
+	Institution  *string `json:"institution"`
 }
 
-type UpdateBalanceInput struct {
-	BalanceID  string `json:"balanceId"`
-	Encryption string `json:"encryption"`
-	Data       string `json:"data"`
+type UpdateBalanceValueInput struct {
+	BalanceID string `json:"balanceId"`
+	Value     string `json:"value"`
 }

@@ -36,6 +36,7 @@ func (s Service) CreateBalance(ctx context.Context, b *balance.Balance, es []*en
 		}
 
 		for _, e := range es {
+			e.BalanceID = b.ID
 			if err := uow.Entries().Create(ctx, e); err != nil {
 				return err
 			}

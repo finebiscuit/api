@@ -5,15 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-
 	"github.com/finebiscuit/api/config"
 	"github.com/finebiscuit/api/services/accounting"
 	"github.com/finebiscuit/api/services/forex"
 	"github.com/finebiscuit/api/services/forex/dinero"
-	"github.com/finebiscuit/api/sqldb"
 )
 
 //go:generate go run github.com/99designs/gqlgen
@@ -27,30 +22,23 @@ type Resolver struct {
 	Forex      ForexService
 }
 
-func NewResolver(cfg *config.Config) (*Resolver, error) {
-	var (
-		accountingTxFn accounting.TxFn
-	)
+type Backend interface {
+	SupportedTypes() []string
+	OpenAndPrepare(ctx context.Context, cfg *config.Config) error
+	AccountingTxFn() accounting.TxFn
+}
 
-	switch cfg.DBType {
-	case "sqlite3", "postgres":
-		db, err := openSQLDatabase(cfg.DBType, cfg.DBSource)
-		if err != nil {
-			return nil, err
-		}
-		accountingTxFn = sqldb.Accounting(db)
-
-		if err := sqldb.AutoMigrate(context.Background(), db); err != nil {
-			return nil, err
-		}
-	default:
+func NewResolver(cfg *config.Config, backends ...Backend) (*Resolver, error) {
+	backend, ok := getBackend(backends, cfg.DBType)
+	if !ok {
 		return nil, fmt.Errorf("unsupported database type: %q", cfg.DBType)
 	}
 
-	accountingService := &accounting.Service{
-		Tx: accountingTxFn,
+	if err := backend.OpenAndPrepare(context.Background(), cfg); err != nil {
+		return nil, err
 	}
 
+	accountingService := &accounting.Service{Tx: backend.AccountingTxFn()}
 	resolver := &Resolver{
 		Forex:      forex.NewService(dinero.New("", 2*time.Hour)),
 		Accounting: accountingService,
@@ -58,15 +46,14 @@ func NewResolver(cfg *config.Config) (*Resolver, error) {
 	return resolver, nil
 }
 
-func openSQLDatabase(dbType, dbSource string) (*gorm.DB, error) {
-	switch dbType {
-	case "sqlite3":
-		return gorm.Open(sqlite.Open(dbSource), &gorm.Config{
-			DisableForeignKeyConstraintWhenMigrating: true,
-		})
-	case "postgres":
-		return gorm.Open(postgres.Open(dbSource))
-	default:
-		return nil, fmt.Errorf("unsupported database type: %q", dbType)
+func getBackend(backends []Backend, dbType string) (Backend, bool) {
+	for _, b := range backends {
+		ts := b.SupportedTypes()
+		for _, t := range ts {
+			if dbType == t {
+				return b, true
+			}
+		}
 	}
+	return nil, false
 }

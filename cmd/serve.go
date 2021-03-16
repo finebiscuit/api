@@ -18,6 +18,7 @@ import (
 	"github.com/finebiscuit/api/config"
 	"github.com/finebiscuit/api/graph"
 	"github.com/finebiscuit/api/graph/generated"
+	"github.com/finebiscuit/api/sqldb"
 )
 
 // serveCmd represents the serve command
@@ -26,7 +27,7 @@ var serveCmd = &cobra.Command{
 	Short: "Serve the Biscuit API",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.New(viper.GetViper())
-		resolver, err := graph.NewResolver(cfg)
+		resolver, err := graph.NewResolver(cfg, sqldb.NewBackend())
 		if err != nil {
 			log.Fatal(err)
 		}
