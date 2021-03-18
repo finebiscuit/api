@@ -60,14 +60,21 @@ func (e *accountingEntry) toDomainEntity() *entry.Entry {
 	}
 }
 
-func (r *accountingEntriesRepository) Get(ctx context.Context, id entry.ID, filter entry.Filter) (*entry.Entry, error) {
+func (r *accountingEntriesRepository) Get(ctx context.Context, balanceID balance.ID, entryID entry.ID) (*entry.Entry, error) {
 	var e *accountingEntry
 
-	q := filterEntry(r.db.WithContext(ctx), filter)
-	if id.Valid() {
-		q = q.Where("id = ?", id)
+	q := r.db.WithContext(ctx).Where("balance_id = ?", balanceID).Where("id = ?", entryID)
+	if res := q.First(&e); res.Error != nil {
+		return nil, res.Error
 	}
 
+	return e.toDomainEntity(), nil
+}
+
+func (r *accountingEntriesRepository) Find(ctx context.Context, balanceID balance.ID, filter entry.Filter) (*entry.Entry, error) {
+	var e *accountingEntry
+
+	q := filterEntry(r.db.WithContext(ctx), filter).Where("balance_id = ?", balanceID)
 	if res := q.Order("valid_at desc").First(&e); res.Error != nil {
 		return nil, res.Error
 	}
@@ -75,10 +82,13 @@ func (r *accountingEntriesRepository) Get(ctx context.Context, id entry.ID, filt
 	return e.toDomainEntity(), nil
 }
 
-func (r *accountingEntriesRepository) List(ctx context.Context, filter entry.Filter) ([]*entry.Entry, error) {
+func (r *accountingEntriesRepository) List(ctx context.Context, balanceID balance.ID, filter entry.Filter) ([]*entry.Entry, error) {
 	var aes []*accountingEntry
 
 	q := filterEntry(r.db.WithContext(ctx), filter)
+	if balanceID.Valid() {
+		q = q.Where("balance_id = ?", balanceID)
+	}
 	if res := q.Order("valid_at desc").Find(&aes); res.Error != nil {
 		return nil, res.Error
 	}
@@ -88,6 +98,28 @@ func (r *accountingEntriesRepository) List(ctx context.Context, filter entry.Fil
 		es = append(es, ae.toDomainEntity())
 	}
 	return es, nil
+}
+
+func (r *accountingEntriesRepository) ListLatestPerBalanceAndCurrency(ctx context.Context, balanceIDs []balance.ID, filter entry.Filter) (map[balance.ID]map[forex.Currency]*entry.Entry, error) {
+	result := make(map[balance.ID]map[forex.Currency]*entry.Entry)
+
+	// TODO: using multiple queries so very inefficient
+	for _, bID := range balanceIDs {
+		subQuery := filterEntry(r.db.Model(&accountingEntry{}), filter).Where("balance_id = ?", bID).Order("valid_at desc")
+		q := r.db.WithContext(ctx).Table("(?)", subQuery).Group("currency")
+
+		var aes []*accountingEntry
+		if res := q.Find(&aes); res.Error != nil {
+			return nil, res.Error
+		}
+
+		result[bID] = make(map[forex.Currency]*entry.Entry)
+		for _, ae := range aes {
+			result[bID][ae.Currency] = ae.toDomainEntity()
+		}
+	}
+
+	return result, nil
 }
 
 func (r *accountingEntriesRepository) Create(ctx context.Context, e *entry.Entry) error {
@@ -105,9 +137,6 @@ func (r *accountingEntriesRepository) Update(ctx context.Context, e *entry.Entry
 
 func filterEntry(q *gorm.DB, filter entry.Filter) *gorm.DB {
 	params := make(map[string]interface{})
-	if filter.BalanceIDs != nil {
-		params["balance_id"] = filter.BalanceIDs
-	}
 	if filter.Currencies != nil {
 		params["currency"] = filter.Currencies
 	}

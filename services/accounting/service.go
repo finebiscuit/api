@@ -83,8 +83,7 @@ func (s Service) ListBalanceEntries(ctx context.Context, bID balance.ID) ([]*ent
 
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		var err error
-		filter := entry.Filter{BalanceIDs: []balance.ID{bID}}
-		entries, err = uow.Entries().List(ctx, filter)
+		entries, err = uow.Entries().List(ctx, bID, entry.Filter{})
 		if err != nil {
 			return err
 		}
@@ -118,11 +117,8 @@ func (s Service) FindLatestEntryByCurrency(ctx context.Context, bID balance.ID, 
 
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		var err error
-		filter := entry.Filter{
-			BalanceIDs: []balance.ID{bID},
-			Currencies: []forex.Currency{currency},
-		}
-		e, err = uow.Entries().Get(ctx, entry.NoID, filter)
+		filter := entry.Filter{Currencies: []forex.Currency{currency}}
+		e, err = uow.Entries().Find(ctx, bID, filter)
 		if err != nil {
 			return err
 		}
