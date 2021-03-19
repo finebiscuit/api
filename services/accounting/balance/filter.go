@@ -1,9 +1,9 @@
 package balance
 
 import (
-	"github.com/finebiscuit/api/services/forex"
+	"github.com/finebiscuit/api/services/forex/currency"
 )
 
 type Filter struct {
-	Currencies []forex.Currency
+	Currencies []currency.Currency
 }

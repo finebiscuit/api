@@ -6,6 +6,11 @@ type BalancePayload struct {
 	Balance *Balance `json:"balance"`
 }
 
+type BalanceValue struct {
+	Currency string `json:"currency"`
+	Value    string `json:"value"`
+}
+
 type CreateBalanceInput struct {
 	Currency     string  `json:"currency"`
 	Kind         string  `json:"kind"`
@@ -13,6 +18,11 @@ type CreateBalanceInput struct {
 	DisplayName  *string `json:"displayName"`
 	OfficialName *string `json:"officialName"`
 	Institution  *string `json:"institution"`
+}
+
+type Preferences struct {
+	DefaultCurrency     *string  `json:"defaultCurrency"`
+	SupportedCurrencies []string `json:"supportedCurrencies"`
 }
 
 type UpdateBalanceInfoInput struct {

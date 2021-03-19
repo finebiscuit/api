@@ -1,10 +1,10 @@
 package model
 
 import (
-	"time"
+	"github.com/shopspring/decimal"
 
 	"github.com/finebiscuit/api/services/accounting/balance"
-	"github.com/finebiscuit/api/services/accounting/entry"
+	"github.com/finebiscuit/api/services/forex/currency"
 )
 
 type Balance struct {
@@ -14,31 +14,18 @@ type Balance struct {
 	DisplayName  *string `json:"displayName"`
 	OfficialName *string `json:"officialName"`
 	Institution  *string `json:"institution"`
+
+	CurrentValues map[currency.Currency]decimal.Decimal
 }
 
-func NewBalance(b *balance.Balance) *Balance {
+func NewBalance(b *balance.WithCurrentValue) *Balance {
 	return &Balance{
-		ID:           string(b.ID),
-		Currency:     b.Currency.String(),
-		Kind:         b.Type.String(),
-		DisplayName:  &b.DisplayName,
-		OfficialName: &b.OfficialName,
-		Institution:  &b.Institution,
-	}
-}
-
-type Entry struct {
-	ID       string    `json:"id"`
-	Currency string    `json:"currency"`
-	Value    string    `json:"value"`
-	ValidAt  time.Time `json:"validAt"`
-}
-
-func NewEntry(e *entry.Entry) *Entry {
-	return &Entry{
-		ID:       string(e.ID),
-		Currency: e.Currency.String(),
-		Value:    e.Value.String(),
-		ValidAt:  e.ValidAt,
+		ID:            string(b.ID),
+		Currency:      b.Currency.String(),
+		Kind:          b.Type.String(),
+		DisplayName:   &b.DisplayName,
+		OfficialName:  &b.OfficialName,
+		Institution:   &b.Institution,
+		CurrentValues: b.CurrentValue,
 	}
 }

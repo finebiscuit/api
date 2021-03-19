@@ -20,6 +20,7 @@ import (
 type Resolver struct {
 	Accounting AccountingService
 	Forex      ForexService
+	Prefs      PreferencesService
 }
 
 type Backend interface {

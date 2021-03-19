@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/finebiscuit/api/services/forex/currency"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	"github.com/finebiscuit/api/services/accounting/balance"
 	"github.com/finebiscuit/api/services/accounting/entry"
-	"github.com/finebiscuit/api/services/forex"
 	"github.com/finebiscuit/api/util"
 )
 
@@ -23,7 +23,7 @@ type accountingEntry struct {
 	gorm.Model
 
 	BalanceID uint
-	Currency  forex.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
+	Currency  currency.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
 	Value     decimal.Decimal
 	ValidAt   time.Time
 
@@ -59,29 +59,6 @@ func (e *accountingEntry) toDomainEntity() *entry.Entry {
 		},
 	}
 }
-
-func (r *accountingEntriesRepository) Get(ctx context.Context, balanceID balance.ID, entryID entry.ID) (*entry.Entry, error) {
-	var e *accountingEntry
-
-	q := r.db.WithContext(ctx).Where("balance_id = ?", balanceID).Where("id = ?", entryID)
-	if res := q.First(&e); res.Error != nil {
-		return nil, res.Error
-	}
-
-	return e.toDomainEntity(), nil
-}
-
-func (r *accountingEntriesRepository) Find(ctx context.Context, balanceID balance.ID, filter entry.Filter) (*entry.Entry, error) {
-	var e *accountingEntry
-
-	q := filterEntry(r.db.WithContext(ctx), filter).Where("balance_id = ?", balanceID)
-	if res := q.Order("valid_at desc").First(&e); res.Error != nil {
-		return nil, res.Error
-	}
-
-	return e.toDomainEntity(), nil
-}
-
 func (r *accountingEntriesRepository) List(ctx context.Context, balanceID balance.ID, filter entry.Filter) ([]*entry.Entry, error) {
 	var aes []*accountingEntry
 
@@ -100,20 +77,20 @@ func (r *accountingEntriesRepository) List(ctx context.Context, balanceID balanc
 	return es, nil
 }
 
-func (r *accountingEntriesRepository) ListLatestPerBalanceAndCurrency(ctx context.Context, balanceIDs []balance.ID, filter entry.Filter) (map[balance.ID]map[forex.Currency]*entry.Entry, error) {
-	result := make(map[balance.ID]map[forex.Currency]*entry.Entry)
+func (r *accountingEntriesRepository) ListLatestPerBalanceAndCurrency(ctx context.Context, balanceIDs []balance.ID, filter entry.Filter) (map[balance.ID]map[currency.Currency]*entry.Entry, error) {
+	result := make(map[balance.ID]map[currency.Currency]*entry.Entry)
 
-	// TODO: using multiple queries so very inefficient
+	// TODO: improve, using multiple queries so very inefficient
 	for _, bID := range balanceIDs {
 		subQuery := filterEntry(r.db.Model(&accountingEntry{}), filter).Where("balance_id = ?", bID).Order("valid_at desc")
-		q := r.db.WithContext(ctx).Table("(?)", subQuery).Group("currency")
+		q := r.db.WithContext(ctx).Table("(?) AS e", subQuery).Group("e.currency")
 
 		var aes []*accountingEntry
 		if res := q.Find(&aes); res.Error != nil {
 			return nil, res.Error
 		}
 
-		result[bID] = make(map[forex.Currency]*entry.Entry)
+		result[bID] = make(map[currency.Currency]*entry.Entry)
 		for _, ae := range aes {
 			result[bID][ae.Currency] = ae.toDomainEntity()
 		}
@@ -122,16 +99,23 @@ func (r *accountingEntriesRepository) ListLatestPerBalanceAndCurrency(ctx contex
 	return result, nil
 }
 
-func (r *accountingEntriesRepository) Create(ctx context.Context, e *entry.Entry) error {
-	ae := newAccountingEntry(e)
-	if res := r.db.WithContext(ctx).Create(&ae); res.Error != nil {
-		return res.Error
+func (r *accountingEntriesRepository) CreateBatch(ctx context.Context, balanceID balance.ID, values map[currency.Currency]decimal.Decimal, validAt time.Time) error {
+	for k, v := range values {
+		e := &entry.Entry{
+			BalanceID: balanceID,
+			Currency:  k,
+			Value:     v,
+			ValidAt:   validAt,
+		}
+		ae := newAccountingEntry(e)
+		if res := r.db.WithContext(ctx).Create(&ae); res.Error != nil {
+			return res.Error
+		}
 	}
-	e.ID = entry.ParseID(uintToString(ae.ID))
 	return nil
 }
 
-func (r *accountingEntriesRepository) Update(ctx context.Context, e *entry.Entry) error {
+func (r *accountingEntriesRepository) DeleteAll(ctx context.Context, balanceID balance.ID) error {
 	panic("implement me")
 }
 

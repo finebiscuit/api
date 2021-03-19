@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/finebiscuit/api/services/accounting/entry"
+	"github.com/finebiscuit/api/services/forex/currency"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	"github.com/finebiscuit/api/services/accounting/balance"
-	"github.com/finebiscuit/api/services/forex"
 	"github.com/finebiscuit/api/util"
 )
 
@@ -21,7 +22,7 @@ var _ balance.Repository = &accountingBalancesRepository{}
 type accountingBalance struct {
 	gorm.Model
 
-	Currency forex.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
+	Currency currency.Currency `gorm:"size:8;not null;check:length(currency) >= 3"`
 	Type     balance.Type
 
 	DisplayName  sql.NullString
@@ -83,12 +84,36 @@ func (l accountingBalanceList) toDomainEntity() []*balance.Balance {
 	return bs
 }
 
-func (r *accountingBalancesRepository) Get(ctx context.Context, id balance.ID, filter balance.Filter) (*balance.Balance, error) {
+func (r *accountingBalancesRepository) Get(ctx context.Context, id balance.ID) (*balance.Balance, error) {
 	var b accountingBalance
 	if res := r.db.WithContext(ctx).First(&b, id); res.Error != nil {
 		return nil, res.Error
 	}
 	return b.toDomainEntity(), nil
+}
+
+func (r *accountingBalancesRepository) GetWithCurrentValue(ctx context.Context, id balance.ID) (*balance.WithCurrentValue, error) {
+	b, err := r.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	entryRepo := &accountingEntriesRepository{db: r.db}
+	m, err := entryRepo.ListLatestPerBalanceAndCurrency(ctx, []balance.ID{id}, entry.Filter{})
+	if err != nil {
+		return nil, err
+	}
+
+	valMap := make(map[currency.Currency]decimal.Decimal)
+	for cur, e := range m[id] {
+		valMap[cur] = e.Value
+	}
+
+	bwcv := &balance.WithCurrentValue{
+		Balance:      *b,
+		CurrentValue: valMap,
+	}
+	return bwcv, nil
 }
 
 func (r *accountingBalancesRepository) List(ctx context.Context, filter balance.Filter) ([]*balance.Balance, error) {
@@ -103,6 +128,38 @@ func (r *accountingBalancesRepository) List(ctx context.Context, filter balance.
 		return nil, res.Error
 	}
 	return bs.toDomainEntity(), nil
+}
+
+func (r *accountingBalancesRepository) ListWithCurrentValue(ctx context.Context, filter balance.Filter) ([]*balance.WithCurrentValue, error) {
+	bs, err := r.List(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]balance.ID, 0, len(bs))
+	for _, b := range bs {
+		ids = append(ids, b.ID)
+	}
+
+	entryRepo := &accountingEntriesRepository{db: r.db}
+	m, err := entryRepo.ListLatestPerBalanceAndCurrency(ctx, ids, entry.Filter{})
+	if err != nil {
+		return nil, err
+	}
+
+	bwcvs := make([]*balance.WithCurrentValue, 0, len(bs))
+	for _, b := range bs {
+		valMap := make(map[currency.Currency]decimal.Decimal)
+		for cur, e := range m[b.ID] {
+			valMap[cur] = e.Value
+		}
+
+		bwcvs = append(bwcvs, &balance.WithCurrentValue{
+			Balance:      *b,
+			CurrentValue: valMap,
+		})
+	}
+	return bwcvs, nil
 }
 
 func (r *accountingBalancesRepository) Create(ctx context.Context, b *balance.Balance) error {

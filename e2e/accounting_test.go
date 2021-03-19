@@ -19,7 +19,7 @@ func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
 	require.NoError(t, err)
 
 	var (
-		balanceID string
+		bal *model.Balance
 	)
 
 	t.Run("Mutation_CreateBalance", func(t *testing.T) {
@@ -76,7 +76,7 @@ func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
 					assert.Equal(t, "Balance", *b.DisplayName)
 					assert.Equal(t, "Institution", *b.Institution)
 					assert.Equal(t, "Institution's Balance", *b.OfficialName)
-					balanceID = b.ID
+					bal = b
 				case "RUB":
 					assert.Equal(t, "CashPhysical", b.Kind)
 					assert.Empty(t, b.DisplayName)
@@ -90,21 +90,22 @@ func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
 	t.Run("Mutation_UpdateBalanceValue", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			res, err := resolver.Mutation().UpdateBalanceValue(ctx, model.UpdateBalanceValueInput{
-				BalanceID: balanceID,
+				BalanceID: bal.ID,
 				Value:     "234.56",
 			})
 			require.NoError(t, err)
 			require.NotNil(t, res.Balance)
+			bal = res.Balance
 		})
 	})
 
-	t.Run("Balance_AllEntries", func(t *testing.T) {
-		res, err := resolver.Balance().AllEntries(ctx, &model.Balance{ID: balanceID})
+	t.Run("Balance_AllCurrentValues", func(t *testing.T) {
+		res, err := resolver.Balance().AllCurrentValues(ctx, bal)
 		require.NoError(t, err)
-		require.Len(t, res, 2)
+		require.Len(t, res, 1)
 
+		assert.Equal(t, "EUR", res[0].Currency)
 		assert.Equal(t, "234.56", res[0].Value)
-		assert.Equal(t, "123.45", res[1].Value)
 	})
 }
 

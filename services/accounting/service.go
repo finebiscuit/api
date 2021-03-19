@@ -2,22 +2,58 @@ package accounting
 
 import (
 	"context"
+	"time"
+
+	"github.com/shopspring/decimal"
 
 	"github.com/finebiscuit/api/services/accounting/balance"
-	"github.com/finebiscuit/api/services/accounting/entry"
-	"github.com/finebiscuit/api/services/forex"
+	"github.com/finebiscuit/api/services/forex/currency"
 )
 
 type Service struct {
 	Tx TxFn
 }
 
-func (s Service) ListBalances(ctx context.Context) ([]*balance.Balance, error) {
-	var bals []*balance.Balance
+func (s Service) GetBalance(ctx context.Context, id balance.ID) (*balance.Balance, error) {
+	var b *balance.Balance
 
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		var err error
-		bals, err = uow.Balances().List(ctx, balance.Filter{})
+		b, err = uow.Balances().Get(ctx, id)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func (s Service) GetBalanceWithCurrentValue(ctx context.Context, id balance.ID) (*balance.WithCurrentValue, error) {
+	var b *balance.WithCurrentValue
+
+	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
+		var err error
+		b, err = uow.Balances().GetWithCurrentValue(ctx, id)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func (s Service) ListBalancesWithCurrentValue(ctx context.Context) ([]*balance.WithCurrentValue, error) {
+	var bals []*balance.WithCurrentValue
+
+	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
+		var err error
+		bals, err = uow.Balances().ListWithCurrentValue(ctx, balance.Filter{})
 		if err != nil {
 			return err
 		}
@@ -29,17 +65,14 @@ func (s Service) ListBalances(ctx context.Context) ([]*balance.Balance, error) {
 	return bals, nil
 }
 
-func (s Service) CreateBalance(ctx context.Context, b *balance.Balance, es []*entry.Entry) error {
+func (s Service) CreateBalance(ctx context.Context, b *balance.Balance, values map[currency.Currency]decimal.Decimal) error {
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		if err := uow.Balances().Create(ctx, b); err != nil {
 			return err
 		}
 
-		for _, e := range es {
-			e.BalanceID = b.ID
-			if err := uow.Entries().Create(ctx, e); err != nil {
-				return err
-			}
+		if err := uow.Entries().CreateBatch(ctx, b.ID, values, time.Now()); err != nil {
+			return err
 		}
 
 		return nil
@@ -50,7 +83,7 @@ func (s Service) CreateBalance(ctx context.Context, b *balance.Balance, es []*en
 	return nil
 }
 
-func (s Service) UpdateBalance(ctx context.Context, b *balance.Balance) error {
+func (s Service) UpdateBalanceInfo(ctx context.Context, b *balance.Balance) error {
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		if err := uow.Balances().Update(ctx, b); err != nil {
 			return err
@@ -63,12 +96,10 @@ func (s Service) UpdateBalance(ctx context.Context, b *balance.Balance) error {
 	return nil
 }
 
-func (s Service) AddEntries(ctx context.Context, es []*entry.Entry) error {
+func (s Service) UpdateBalanceValue(ctx context.Context, balanceID balance.ID, values map[currency.Currency]decimal.Decimal) error {
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
-		for _, e := range es {
-			if err := uow.Entries().Create(ctx, e); err != nil {
-				return err
-			}
+		if err := uow.Entries().CreateBatch(ctx, balanceID, values, time.Now()); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -78,54 +109,18 @@ func (s Service) AddEntries(ctx context.Context, es []*entry.Entry) error {
 	return nil
 }
 
-func (s Service) ListBalanceEntries(ctx context.Context, bID balance.ID) ([]*entry.Entry, error) {
-	var entries []*entry.Entry
-
+func (s Service) DeleteBalance(ctx context.Context, balanceID balance.ID) error {
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
-		var err error
-		entries, err = uow.Entries().List(ctx, bID, entry.Filter{})
-		if err != nil {
+		if err := uow.Entries().DeleteAll(ctx, balanceID); err != nil {
+			return err
+		}
+		if err := uow.Balances().Delete(ctx, balanceID); err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return entries, nil
-}
-
-func (s Service) FindBalance(ctx context.Context, id balance.ID, filter balance.Filter) (*balance.Balance, error) {
-	var b *balance.Balance
-
-	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
-		var err error
-		b, err = uow.Balances().Get(ctx, id, filter)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-func (s Service) FindLatestEntryByCurrency(ctx context.Context, bID balance.ID, currency forex.Currency) (*entry.Entry, error) {
-	var e *entry.Entry
-
-	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
-		var err error
-		filter := entry.Filter{Currencies: []forex.Currency{currency}}
-		e, err = uow.Entries().Find(ctx, bID, filter)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return e, nil
+	return nil
 }
