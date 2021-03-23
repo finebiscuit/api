@@ -4,17 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/finebiscuit/api/services/forex"
 	"gorm.io/gorm"
 
 	"github.com/finebiscuit/api/config"
 )
 
 type Backend struct {
-	db *gorm.DB
+	db    *gorm.DB
+	Forex forex.Service
 }
 
-func NewBackend() *Backend {
-	return &Backend{}
+func NewBackend(forexSvc forex.Service) *Backend {
+	return &Backend{Forex: forexSvc}
 }
 
 func (b *Backend) SupportedTypes() []string {
@@ -37,6 +39,7 @@ func (b *Backend) OpenAndPrepare(ctx context.Context, cfg *config.Config) error 
 	}
 
 	if err := db.WithContext(ctx).AutoMigrate(
+		&preference{},
 		&accountingBalance{},
 		&accountingEntry{},
 	); err != nil {

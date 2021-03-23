@@ -8,18 +8,18 @@ import (
 	"github.com/finebiscuit/api/services/forex/currency"
 )
 
-type ExchangeAPI interface {
+type Service interface {
 	GetRate(ctx context.Context, from, to currency.Currency) (decimal.Decimal, error)
 }
 
-type Service struct {
-	api ExchangeAPI
+type service struct {
+	api Repository
 }
 
-func NewService(api ExchangeAPI) *Service {
-	return &Service{api: api}
+func NewService(api Repository) Service {
+	return &service{api: api}
 }
 
-func (s *Service) GetRate(ctx context.Context, from, to currency.Currency) (decimal.Decimal, error) {
+func (s *service) GetRate(ctx context.Context, from, to currency.Currency) (decimal.Decimal, error) {
 	return s.api.GetRate(ctx, from, to)
 }

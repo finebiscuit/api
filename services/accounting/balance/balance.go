@@ -36,8 +36,10 @@ func New(currency currency.Currency, typ Type, opt Optional) *Balance {
 	}
 }
 
+type ValueMap map[currency.Currency]decimal.Decimal
+
 type WithCurrentValue struct {
 	Balance
 
-	CurrentValue map[currency.Currency]decimal.Decimal
+	CurrentValue ValueMap
 }

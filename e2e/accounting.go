@@ -4,27 +4,52 @@ import (
 	"context"
 	"testing"
 
+	"github.com/finebiscuit/api/services/forex/currency"
+	"github.com/finebiscuit/api/services/prefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/finebiscuit/api/config"
 	"github.com/finebiscuit/api/graph"
 	"github.com/finebiscuit/api/graph/model"
 	"github.com/finebiscuit/api/services/accounting/balance"
-	"github.com/finebiscuit/api/sqldb"
 )
 
-func accountingTests(t *testing.T, ctx context.Context, cfg *config.Config) {
-	resolver, err := graph.NewResolver(cfg, sqldb.NewBackend())
-	require.NoError(t, err)
-
+func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver) {
 	var (
 		bal *model.Balance
 	)
 
+	err := resolver.Prefs.SetPreferences(ctx, &prefs.Preferences{
+		DefaultCurrency:     currency.EUR,
+		SupportedCurrencies: []currency.Currency{currency.EUR, currency.RUB},
+	})
+	require.NoError(t, err)
+
 	t.Run("Mutation_CreateBalance", func(t *testing.T) {
 		t.Run("InvalidEmpty", func(t *testing.T) {
 			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{})
+			assert.Error(t, err)
+			assert.Nil(t, res)
+		})
+
+		t.Run("InvalidUserUnsupportedCurrency", func(t *testing.T) {
+			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
+				Currency:    "GBP",
+				Kind:        balance.CashChecking.String(),
+				Value:       "123.45",
+				DisplayName: strPtr("Unsupported Balance"),
+			})
+			assert.Error(t, err)
+			assert.Nil(t, res)
+		})
+
+		t.Run("InvalidBadCurrency", func(t *testing.T) {
+			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
+				Currency:    "INVALID",
+				Kind:        balance.CashChecking.String(),
+				Value:       "123.45",
+				DisplayName: strPtr("Bad Currency Balance"),
+			})
 			assert.Error(t, err)
 			assert.Nil(t, res)
 		})

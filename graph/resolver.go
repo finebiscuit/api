@@ -9,6 +9,7 @@ import (
 	"github.com/finebiscuit/api/services/accounting"
 	"github.com/finebiscuit/api/services/forex"
 	"github.com/finebiscuit/api/services/forex/dinero"
+	"github.com/finebiscuit/api/services/prefs"
 )
 
 //go:generate go run github.com/99designs/gqlgen
@@ -19,7 +20,7 @@ import (
 
 type Resolver struct {
 	Accounting AccountingService
-	Forex      ForexService
+	Forex      forex.Service
 	Prefs      PreferencesService
 }
 
@@ -27,6 +28,7 @@ type Backend interface {
 	SupportedTypes() []string
 	OpenAndPrepare(ctx context.Context, cfg *config.Config) error
 	AccountingTxFn() accounting.TxFn
+	PreferencesTxFn() prefs.TxFn
 }
 
 func NewResolver(cfg *config.Config, backends ...Backend) (*Resolver, error) {
@@ -39,10 +41,12 @@ func NewResolver(cfg *config.Config, backends ...Backend) (*Resolver, error) {
 		return nil, err
 	}
 
+	prefsService := &prefs.Service{Tx: backend.PreferencesTxFn()}
 	accountingService := &accounting.Service{Tx: backend.AccountingTxFn()}
 	resolver := &Resolver{
 		Forex:      forex.NewService(dinero.New("", 2*time.Hour)),
 		Accounting: accountingService,
+		Prefs:      prefsService,
 	}
 	return resolver, nil
 }

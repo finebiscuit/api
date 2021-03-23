@@ -18,8 +18,9 @@ var _CurrencyIndex = [...]uint8{0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 
 const _CurrencyLowerName = "xxxxtsaudcadeurjpynzdnokgbpsekchfusdrubtrydkkplnhufczkilsaedronbgnrsduahxagxauxptxpdbchbtcethltcxrp"
 
 func (i Currency) String() string {
+	i -= 1
 	if i >= Currency(len(_CurrencyIndex)-1) {
-		return fmt.Sprintf("Currency(%d)", i)
+		return fmt.Sprintf("Currency(%d)", i+1)
 	}
 	return _CurrencyName[_CurrencyIndex[i]:_CurrencyIndex[i+1]]
 }
@@ -28,39 +29,39 @@ func (i Currency) String() string {
 // Re-run the stringer command to generate them again.
 func _CurrencyNoOp() {
 	var x [1]struct{}
-	_ = x[XXX-(0)]
-	_ = x[XTS-(1)]
-	_ = x[AUD-(2)]
-	_ = x[CAD-(3)]
-	_ = x[EUR-(4)]
-	_ = x[JPY-(5)]
-	_ = x[NZD-(6)]
-	_ = x[NOK-(7)]
-	_ = x[GBP-(8)]
-	_ = x[SEK-(9)]
-	_ = x[CHF-(10)]
-	_ = x[USD-(11)]
-	_ = x[RUB-(12)]
-	_ = x[TRY-(13)]
-	_ = x[DKK-(14)]
-	_ = x[PLN-(15)]
-	_ = x[HUF-(16)]
-	_ = x[CZK-(17)]
-	_ = x[ILS-(18)]
-	_ = x[AED-(19)]
-	_ = x[RON-(20)]
-	_ = x[BGN-(21)]
-	_ = x[RSD-(22)]
-	_ = x[UAH-(23)]
-	_ = x[XAG-(24)]
-	_ = x[XAU-(25)]
-	_ = x[XPT-(26)]
-	_ = x[XPD-(27)]
-	_ = x[BCH-(28)]
-	_ = x[BTC-(29)]
-	_ = x[ETH-(30)]
-	_ = x[LTC-(31)]
-	_ = x[XRP-(32)]
+	_ = x[XXX-(1)]
+	_ = x[XTS-(2)]
+	_ = x[AUD-(3)]
+	_ = x[CAD-(4)]
+	_ = x[EUR-(5)]
+	_ = x[JPY-(6)]
+	_ = x[NZD-(7)]
+	_ = x[NOK-(8)]
+	_ = x[GBP-(9)]
+	_ = x[SEK-(10)]
+	_ = x[CHF-(11)]
+	_ = x[USD-(12)]
+	_ = x[RUB-(13)]
+	_ = x[TRY-(14)]
+	_ = x[DKK-(15)]
+	_ = x[PLN-(16)]
+	_ = x[HUF-(17)]
+	_ = x[CZK-(18)]
+	_ = x[ILS-(19)]
+	_ = x[AED-(20)]
+	_ = x[RON-(21)]
+	_ = x[BGN-(22)]
+	_ = x[RSD-(23)]
+	_ = x[UAH-(24)]
+	_ = x[XAG-(25)]
+	_ = x[XAU-(26)]
+	_ = x[XPT-(27)]
+	_ = x[XPD-(28)]
+	_ = x[BCH-(29)]
+	_ = x[BTC-(30)]
+	_ = x[ETH-(31)]
+	_ = x[LTC-(32)]
+	_ = x[XRP-(33)]
 }
 
 var _CurrencyValues = []Currency{XXX, XTS, AUD, CAD, EUR, JPY, NZD, NOK, GBP, SEK, CHF, USD, RUB, TRY, DKK, PLN, HUF, CZK, ILS, AED, RON, BGN, RSD, UAH, XAG, XAU, XPT, XPD, BCH, BTC, ETH, LTC, XRP}

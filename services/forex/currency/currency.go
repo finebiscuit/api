@@ -9,7 +9,7 @@ import (
 type Currency uint8
 
 const (
-	XXX Currency = iota
+	XXX Currency = iota + 1
 	XTS
 
 	// G10 currencies https://en.wikipedia.org/wiki/G10_currencies.

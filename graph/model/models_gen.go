@@ -20,9 +20,8 @@ type CreateBalanceInput struct {
 	Institution  *string `json:"institution"`
 }
 
-type Preferences struct {
-	DefaultCurrency     *string  `json:"defaultCurrency"`
-	SupportedCurrencies []string `json:"supportedCurrencies"`
+type PreferencesPayload struct {
+	Preferences *Preferences `json:"preferences"`
 }
 
 type UpdateBalanceInfoInput struct {
@@ -35,4 +34,13 @@ type UpdateBalanceInfoInput struct {
 type UpdateBalanceValueInput struct {
 	BalanceID string `json:"balanceId"`
 	Value     string `json:"value"`
+}
+
+type UpdatePreferencesParams struct {
+	DefaultCurrency     *string  `json:"defaultCurrency"`
+	SupportedCurrencies []string `json:"supportedCurrencies"`
+}
+
+type Version struct {
+	Canonical string `json:"canonical"`
 }

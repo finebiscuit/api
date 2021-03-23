@@ -1,0 +1,29 @@
+scalar Time
+directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+type Version {
+  canonical: String!
+}
+
+type Preferences {
+  defaultCurrency: String
+  supportedCurrencies: [String!]
+}
+
+type Query {
+  version: Version!
+  preferences: Preferences
+}
+
+input UpdatePreferencesParams {
+  defaultCurrency: String
+  supportedCurrencies: [String!]
+}
+
+type PreferencesPayload {
+  preferences: Preferences
+}
+
+type Mutation {
+  updatePreferences(params: UpdatePreferencesParams!): PreferencesPayload
+}

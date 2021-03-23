@@ -1,0 +1,54 @@
+type Balance {
+    id: ID!
+    currency: String!
+    kind: String!
+
+    displayName: String
+    officialName: String
+    institution: String
+
+    allCurrentValues: [BalanceValue!]! @goField(forceResolver: true)
+    currentValue(currency: String!): BalanceValue
+}
+
+type BalanceValue {
+    currency: String!
+    value: String!
+}
+
+extend type Query {
+    balances: [Balance!]
+}
+
+input CreateBalanceInput {
+    currency: String!
+    kind: String!
+    value: String!
+    displayName: String
+    officialName: String
+    institution: String
+}
+
+input UpdateBalanceInfoInput {
+    balanceId: ID!
+    displayName: String
+    officialName: String
+    institution: String
+}
+
+input UpdateBalanceValueInput {
+    balanceId: ID!
+    value: String!
+}
+
+type BalancePayload {
+    balance: Balance
+}
+
+extend type Mutation {
+    createBalance(params: CreateBalanceInput!): BalancePayload
+    removeBalance(balanceId: ID!): BalancePayload
+    updateBalanceInfo(params: UpdateBalanceInfoInput!): BalancePayload
+    updateBalanceValue(params: UpdateBalanceValueInput!): BalancePayload
+}
+

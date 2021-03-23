@@ -3,6 +3,8 @@ package sqldb
 import (
 	"context"
 
+	"github.com/finebiscuit/api/services/forex"
+	"github.com/finebiscuit/api/services/prefs"
 	"gorm.io/gorm"
 
 	"github.com/finebiscuit/api/services/accounting"
@@ -11,15 +13,16 @@ import (
 )
 
 type UnitOfWork struct {
-	tx *gorm.DB
+	tx    *gorm.DB
+	forex forex.Service
 }
 
-func newUnitOfWork(ctx context.Context, db *gorm.DB) (*UnitOfWork, error) {
-	tx := db.WithContext(ctx).Begin()
+func newUnitOfWork(ctx context.Context, b *Backend) (*UnitOfWork, error) {
+	tx := b.db.WithContext(ctx).Begin()
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
-	uow := &UnitOfWork{tx: tx}
+	uow := &UnitOfWork{tx: tx, forex: b.Forex}
 	return uow, nil
 }
 
@@ -39,9 +42,36 @@ func (uow *UnitOfWork) Entries() entry.Repository {
 	return &accountingEntriesRepository{db: uow.tx}
 }
 
+func (uow *UnitOfWork) Preferences() prefs.Repository {
+	return &preferencesRepository{db: uow.tx}
+}
+
+func (uow *UnitOfWork) Forex() forex.Repository {
+	return uow.forex
+}
+
 func (b *Backend) AccountingTxFn() accounting.TxFn {
 	return func(ctx context.Context, fn func(ctx context.Context, uow accounting.UnitOfWork) error) error {
-		uow, err := newUnitOfWork(ctx, b.db)
+		uow, err := newUnitOfWork(ctx, b)
+		if err != nil {
+			return err
+		}
+		if err := fn(ctx, uow); err != nil {
+			uow.Rollback()
+			return err
+		} else {
+			if err := uow.Commit(); err != nil {
+				uow.Rollback()
+				return err
+			}
+			return nil
+		}
+	}
+}
+
+func (b *Backend) PreferencesTxFn() prefs.TxFn {
+	return func(ctx context.Context, fn func(ctx context.Context, uow prefs.UnitOfWork) error) error {
+		uow, err := newUnitOfWork(ctx, b)
 		if err != nil {
 			return err
 		}

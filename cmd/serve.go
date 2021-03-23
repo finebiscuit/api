@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/finebiscuit/api/services/forex/dinero"
 	"github.com/go-chi/chi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,7 +29,8 @@ var serveCmd = &cobra.Command{
 	Short: "Serve the Biscuit API",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.New(viper.GetViper())
-		resolver, err := graph.NewResolver(cfg, sqldb.NewBackend())
+		forexSvc := dinero.New("", time.Hour)
+		resolver, err := graph.NewResolver(cfg, sqldb.NewBackend(forexSvc))
 		if err != nil {
 			log.Fatal(err)
 		}
