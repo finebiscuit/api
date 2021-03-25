@@ -10,7 +10,8 @@ import (
 
 func MarshalDecimal(d decimal.Decimal) graphql.Marshaler {
 	return graphql.WriterFunc(func(w io.Writer) {
-		w.Write([]byte(d.String()))
+		data, _ := d.MarshalJSON()
+		w.Write(data)
 	})
 }
 
