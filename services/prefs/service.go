@@ -8,11 +8,20 @@ import (
 	"github.com/finebiscuit/api/services/forex/currency"
 )
 
-type Service struct {
+type Service interface {
+	GetPreferences(ctx context.Context) (*Preferences, error)
+	SetPreferences(ctx context.Context, p *Preferences) error
+}
+
+type service struct {
 	Tx TxFn
 }
 
-func (s Service) GetPreferences(ctx context.Context) (*Preferences, error) {
+func NewService(tx TxFn) Service {
+	return &service{Tx: tx}
+}
+
+func (s service) GetPreferences(ctx context.Context) (*Preferences, error) {
 	var p *Preferences
 
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
@@ -29,7 +38,7 @@ func (s Service) GetPreferences(ctx context.Context) (*Preferences, error) {
 	return p, nil
 }
 
-func (s Service) SetPreferences(ctx context.Context, p *Preferences) error {
+func (s service) SetPreferences(ctx context.Context, p *Preferences) error {
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		oldPrefs, err := uow.Preferences().Get(ctx)
 		if err != nil {

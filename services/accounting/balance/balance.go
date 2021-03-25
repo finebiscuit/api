@@ -1,6 +1,8 @@
 package balance
 
 import (
+	"time"
+
 	"github.com/shopspring/decimal"
 
 	"github.com/finebiscuit/api/services/forex/currency"
@@ -41,5 +43,6 @@ type ValueMap map[currency.Currency]decimal.Decimal
 type WithCurrentValue struct {
 	Balance
 
+	ValidAt      time.Time
 	CurrentValue ValueMap
 }

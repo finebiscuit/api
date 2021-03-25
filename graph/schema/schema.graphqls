@@ -6,8 +6,8 @@ type Version {
 }
 
 type Preferences {
-  defaultCurrency: String
-  supportedCurrencies: [String!]
+  defaultCurrency: Currency
+  supportedCurrencies: [Currency!]
 }
 
 type Query {
@@ -16,8 +16,8 @@ type Query {
 }
 
 input UpdatePreferencesParams {
-  defaultCurrency: String
-  supportedCurrencies: [String!]
+  defaultCurrency: Currency
+  supportedCurrencies: [Currency!]
 }
 
 type PreferencesPayload {

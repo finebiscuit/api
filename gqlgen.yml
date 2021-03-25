@@ -54,3 +54,7 @@ models:
       - github.com/99designs/gqlgen/graphql.Int
       - github.com/99designs/gqlgen/graphql.Int64
       - github.com/99designs/gqlgen/graphql.Int32
+  Currency:
+    model: github.com/finebiscuit/api/services/forex/currency.Currency
+  Decimal:
+    model: github.com/finebiscuit/api/graph/model.Decimal

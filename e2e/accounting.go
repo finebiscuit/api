@@ -4,14 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/finebiscuit/api/services/forex/currency"
-	"github.com/finebiscuit/api/services/prefs"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/finebiscuit/api/graph"
 	"github.com/finebiscuit/api/graph/model"
 	"github.com/finebiscuit/api/services/accounting/balance"
+	"github.com/finebiscuit/api/services/forex/currency"
+	"github.com/finebiscuit/api/services/prefs"
 )
 
 func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver) {
@@ -34,9 +35,9 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 
 		t.Run("InvalidUserUnsupportedCurrency", func(t *testing.T) {
 			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
-				Currency:    "GBP",
+				Currency:    currency.GBP,
 				Kind:        balance.CashChecking.String(),
-				Value:       "123.45",
+				Value:       decimal.RequireFromString("123.45"),
 				DisplayName: strPtr("Unsupported Balance"),
 			})
 			assert.Error(t, err)
@@ -45,9 +46,9 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 
 		t.Run("InvalidBadCurrency", func(t *testing.T) {
 			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
-				Currency:    "INVALID",
+				Currency:    255,
 				Kind:        balance.CashChecking.String(),
-				Value:       "123.45",
+				Value:       decimal.RequireFromString("123.45"),
 				DisplayName: strPtr("Bad Currency Balance"),
 			})
 			assert.Error(t, err)
@@ -56,16 +57,16 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 
 		t.Run("Success", func(t *testing.T) {
 			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
-				Currency:     "EUR",
+				Currency:     currency.EUR,
 				Kind:         balance.CashChecking.String(),
-				Value:        "123.45",
+				Value:        decimal.RequireFromString("123.45"),
 				DisplayName:  strPtr("Balance"),
 				Institution:  strPtr("Institution"),
 				OfficialName: strPtr("Institution's Balance"),
 			})
 			require.NoError(t, err)
 			require.NotNil(t, res.Balance)
-			assert.Equal(t, "EUR", res.Balance.Currency)
+			assert.Equal(t, currency.EUR, res.Balance.Currency)
 			assert.Equal(t, "CashChecking", res.Balance.Kind)
 			assert.Equal(t, "Balance", *res.Balance.DisplayName)
 			assert.Equal(t, "Institution", *res.Balance.Institution)
@@ -74,13 +75,13 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 
 		t.Run("SuccessNoOptional", func(t *testing.T) {
 			res, err := resolver.Mutation().CreateBalance(ctx, model.CreateBalanceInput{
-				Currency: "RUB",
+				Currency: currency.RUB,
 				Kind:     balance.CashPhysical.String(),
-				Value:    "543.21",
+				Value:    decimal.RequireFromString("543.21"),
 			})
 			require.NoError(t, err)
 			require.NotNil(t, res.Balance)
-			assert.Equal(t, "RUB", res.Balance.Currency)
+			assert.Equal(t, currency.RUB, res.Balance.Currency)
 			assert.Equal(t, "CashPhysical", res.Balance.Kind)
 			assert.Empty(t, res.Balance.DisplayName)
 			assert.Empty(t, res.Balance.Institution)
@@ -96,13 +97,13 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 
 			for _, b := range res {
 				switch b.Currency {
-				case "EUR":
+				case currency.EUR:
 					assert.Equal(t, "CashChecking", b.Kind)
 					assert.Equal(t, "Balance", *b.DisplayName)
 					assert.Equal(t, "Institution", *b.Institution)
 					assert.Equal(t, "Institution's Balance", *b.OfficialName)
 					bal = b
-				case "RUB":
+				case currency.RUB:
 					assert.Equal(t, "CashPhysical", b.Kind)
 					assert.Empty(t, b.DisplayName)
 					assert.Empty(t, b.Institution)
@@ -129,7 +130,7 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 
-		assert.Equal(t, "EUR", res[0].Currency)
+		assert.Equal(t, currency.EUR, res[0].Currency)
 		assert.Equal(t, "234.56", res[0].Value)
 	})
 }

@@ -17,20 +17,12 @@ func (r *mutationResolver) UpdatePreferences(ctx context.Context, params model.U
 	var p prefs.Preferences
 
 	if params.DefaultCurrency != nil {
-		cur, err := forexcurrency.CurrencyString(*params.DefaultCurrency)
-		if err != nil {
-			return nil, err
-		}
-		p.DefaultCurrency = cur
+		p.DefaultCurrency = *params.DefaultCurrency
 	}
 
 	if params.SupportedCurrencies != nil {
 		p.SupportedCurrencies = make([]forexcurrency.Currency, 0, len(params.SupportedCurrencies))
-		for _, s := range params.SupportedCurrencies {
-			c, err := forexcurrency.CurrencyString(s)
-			if err != nil {
-				return nil, err
-			}
+		for _, c := range params.SupportedCurrencies {
 			p.SupportedCurrencies = append(p.SupportedCurrencies, c)
 		}
 	}

@@ -21,18 +21,22 @@ func PreferencesTests(t *testing.T, ctx context.Context, resolver *graph.Resolve
 
 	t.Run("Mutation_UpdatePreferences", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
+			cur := currency.EUR
 			params := model.UpdatePreferencesParams{
-				DefaultCurrency: strPtr(currency.EUR.String()),
-				SupportedCurrencies: []string{
-					currency.PLN.String(),
-					currency.RUB.String(),
+				DefaultCurrency: &cur,
+				SupportedCurrencies: []currency.Currency{
+					currency.PLN,
+					currency.RUB,
 				},
 			}
 			res, err := resolver.Mutation().UpdatePreferences(ctx, params)
 			require.NoError(t, err)
 			require.NotNil(t, res.Preferences)
 			assert.Equal(t, params.DefaultCurrency, res.Preferences.DefaultCurrency)
-			assert.Equal(t, []string{"EUR", "PLN", "RUB"}, res.Preferences.SupportedCurrencies)
+			assert.Len(t, res.Preferences.SupportedCurrencies, 3)
+			assert.Contains(t, res.Preferences.SupportedCurrencies, currency.EUR)
+			assert.Contains(t, res.Preferences.SupportedCurrencies, currency.PLN)
+			assert.Contains(t, res.Preferences.SupportedCurrencies, currency.RUB)
 		})
 	})
 
@@ -41,7 +45,9 @@ func PreferencesTests(t *testing.T, ctx context.Context, resolver *graph.Resolve
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.NotNil(t, res.DefaultCurrency)
-		assert.Equal(t, "EUR", *res.DefaultCurrency)
-		assert.Equal(t, []string{"EUR", "PLN", "RUB"}, res.SupportedCurrencies)
+		assert.Len(t, res.SupportedCurrencies, 3)
+		assert.Contains(t, res.SupportedCurrencies, currency.EUR)
+		assert.Contains(t, res.SupportedCurrencies, currency.PLN)
+		assert.Contains(t, res.SupportedCurrencies, currency.RUB)
 	})
 }

@@ -7,45 +7,43 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shopspring/decimal"
-
 	"github.com/finebiscuit/api/graph/generated"
 	"github.com/finebiscuit/api/graph/model"
 	"github.com/finebiscuit/api/services/accounting/balance"
 	forexcurrency "github.com/finebiscuit/api/services/forex/currency"
+	"github.com/shopspring/decimal"
 )
 
 func (r *balanceResolver) AllCurrentValues(ctx context.Context, obj *model.Balance) ([]*model.BalanceValue, error) {
 	mvals := make([]*model.BalanceValue, 0, len(obj.CurrentValues))
 	for k, v := range obj.CurrentValues {
-		mvals = append(mvals, &model.BalanceValue{Currency: k.String(), Value: v.String()})
+		mvals = append(mvals, &model.BalanceValue{
+			Currency: k,
+			Value:    v,
+			ValidAt:  obj.ValidAt,
+		})
 	}
 	return mvals, nil
 }
 
-func (r *balanceResolver) CurrentValue(ctx context.Context, obj *model.Balance, currency string) (*model.BalanceValue, error) {
-	c := forexcurrency.New(currency)
-
+func (r *balanceResolver) CurrentValue(ctx context.Context, obj *model.Balance, currency forexcurrency.Currency) (*model.BalanceValue, error) {
 	// TODO: in case there's no value for this currency, use the forex service to dynamically calculate it.
-	v, ok := obj.CurrentValues[c]
+	v, ok := obj.CurrentValues[currency]
 	if !ok {
-		return nil, fmt.Errorf("no value found for currency %q", c)
+		return nil, fmt.Errorf("no value found for currency %q", currency)
 	}
 
-	mval := &model.BalanceValue{Currency: c.String(), Value: v.String()}
-	return mval, nil
+	return model.NewBalanceValue(currency, v, obj.ValidAt), nil
+}
+
+func (r *balanceResolver) HistoricalValues(ctx context.Context, obj *model.Balance, currency forexcurrency.Currency) ([]*model.BalanceValue, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *mutationResolver) CreateBalance(ctx context.Context, params model.CreateBalanceInput) (*model.BalancePayload, error) {
-	cur := forexcurrency.New(params.Currency)
 	typ, err := balance.TypeString(params.Kind)
 	if err != nil {
 		return nil, fmt.Errorf("invalid type: %q", params.Kind)
-	}
-
-	decVal, err := decimal.NewFromString(params.Value)
-	if err != nil {
-		return nil, fmt.Errorf("invalid value: %q", params.Value)
 	}
 
 	opt := balance.Optional{}
@@ -58,10 +56,16 @@ func (r *mutationResolver) CreateBalance(ctx context.Context, params model.Creat
 	if params.Institution != nil {
 		opt.Institution = *params.Institution
 	}
+	if params.EstimatedMonthlyGrowthRate != nil {
+		opt.EstimatedMonthlyGrowthRate = *params.EstimatedMonthlyGrowthRate
+	}
+	if params.EstimatedMonthlyValueChange != nil {
+		opt.EstimatedMonthlyValueChange = *params.EstimatedMonthlyValueChange
+	}
 
-	b := balance.New(cur, typ, opt)
+	b := balance.New(params.Currency, typ, opt)
 
-	values, err := r.Accounting.CreateBalance(ctx, b, decVal)
+	values, err := r.Accounting.CreateBalance(ctx, b, params.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +105,12 @@ func (r *mutationResolver) UpdateBalanceInfo(ctx context.Context, params model.U
 	}
 	if params.Institution != nil {
 		b.Institution = *params.Institution
+	}
+	if params.EstimatedMonthlyGrowthRate != nil {
+		b.EstimatedMonthlyGrowthRate = *params.EstimatedMonthlyGrowthRate
+	}
+	if params.EstimatedMonthlyValueChange != nil {
+		b.EstimatedMonthlyValueChange = *params.EstimatedMonthlyValueChange
 	}
 
 	if err := r.Accounting.UpdateBalanceInfo(ctx, &b.Balance); err != nil {

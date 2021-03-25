@@ -11,11 +11,26 @@ import (
 	"github.com/finebiscuit/api/services/forex/currency"
 )
 
-type Service struct {
+type Service interface {
+	GetBalance(ctx context.Context, id balance.ID) (*balance.Balance, error)
+	GetBalanceWithCurrentValue(ctx context.Context, id balance.ID) (*balance.WithCurrentValue, error)
+	// GetHistoricalValuesPerMonth(ctx context.Context, balanceID balance.ID, cur currency.Currency, since, until time.Time) ([]*entry.Entry, error)
+	ListBalancesWithCurrentValue(ctx context.Context) ([]*balance.WithCurrentValue, error)
+	CreateBalance(ctx context.Context, b *balance.Balance, value decimal.Decimal) (balance.ValueMap, error)
+	UpdateBalanceInfo(ctx context.Context, b *balance.Balance) error
+	UpdateBalanceValue(ctx context.Context, balanceID balance.ID, value decimal.Decimal) (balance.ValueMap, error)
+	DeleteBalance(ctx context.Context, balanceID balance.ID) error
+}
+
+type service struct {
 	Tx TxFn
 }
 
-func (s Service) GetBalance(ctx context.Context, id balance.ID) (*balance.Balance, error) {
+func NewService(tx TxFn) Service {
+	return &service{Tx: tx}
+}
+
+func (s service) GetBalance(ctx context.Context, id balance.ID) (*balance.Balance, error) {
 	var b *balance.Balance
 
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
@@ -32,7 +47,7 @@ func (s Service) GetBalance(ctx context.Context, id balance.ID) (*balance.Balanc
 	return b, nil
 }
 
-func (s Service) GetBalanceWithCurrentValue(ctx context.Context, id balance.ID) (*balance.WithCurrentValue, error) {
+func (s service) GetBalanceWithCurrentValue(ctx context.Context, id balance.ID) (*balance.WithCurrentValue, error) {
 	var b *balance.WithCurrentValue
 
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
@@ -49,7 +64,7 @@ func (s Service) GetBalanceWithCurrentValue(ctx context.Context, id balance.ID) 
 	return b, nil
 }
 
-func (s Service) ListBalancesWithCurrentValue(ctx context.Context) ([]*balance.WithCurrentValue, error) {
+func (s service) ListBalancesWithCurrentValue(ctx context.Context) ([]*balance.WithCurrentValue, error) {
 	var bals []*balance.WithCurrentValue
 
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
@@ -66,7 +81,7 @@ func (s Service) ListBalancesWithCurrentValue(ctx context.Context) ([]*balance.W
 	return bals, nil
 }
 
-func (s Service) CreateBalance(ctx context.Context, b *balance.Balance, value decimal.Decimal) (balance.ValueMap, error) {
+func (s service) CreateBalance(ctx context.Context, b *balance.Balance, value decimal.Decimal) (balance.ValueMap, error) {
 	if !b.Currency.IsACurrency() {
 		return nil, fmt.Errorf("invalid or unsupported currency: %s", b.Currency)
 	}
@@ -110,7 +125,7 @@ func (s Service) CreateBalance(ctx context.Context, b *balance.Balance, value de
 	return values, nil
 }
 
-func (s Service) UpdateBalanceInfo(ctx context.Context, b *balance.Balance) error {
+func (s service) UpdateBalanceInfo(ctx context.Context, b *balance.Balance) error {
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		if err := uow.Balances().Update(ctx, b); err != nil {
 			return err
@@ -123,7 +138,7 @@ func (s Service) UpdateBalanceInfo(ctx context.Context, b *balance.Balance) erro
 	return nil
 }
 
-func (s Service) UpdateBalanceValue(ctx context.Context, balanceID balance.ID, value decimal.Decimal) (balance.ValueMap, error) {
+func (s service) UpdateBalanceValue(ctx context.Context, balanceID balance.ID, value decimal.Decimal) (balance.ValueMap, error) {
 	var values balance.ValueMap
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		p, err := uow.Preferences().Get(ctx)
@@ -159,7 +174,7 @@ func (s Service) UpdateBalanceValue(ctx context.Context, balanceID balance.ID, v
 	return values, nil
 }
 
-func (s Service) DeleteBalance(ctx context.Context, balanceID balance.ID) error {
+func (s service) DeleteBalance(ctx context.Context, balanceID balance.ID) error {
 	err := s.Tx(ctx, func(ctx context.Context, uow UnitOfWork) error {
 		if err := uow.Entries().DeleteAll(ctx, balanceID); err != nil {
 			return err

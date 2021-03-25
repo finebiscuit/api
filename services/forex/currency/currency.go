@@ -59,3 +59,19 @@ func New(s string) Currency {
 	}
 	return c
 }
+
+func (i Currency) Valid() bool {
+	return i.IsACurrency() && i >= AUD
+}
+
+func (i Currency) IsFiat() bool {
+	return i.Valid() && i < XAG
+}
+
+func (i Currency) IsPreciousMetal() bool {
+	return i.Valid() && i >= XAG && i < BCH
+}
+
+func (i Currency) IsCrypto() bool {
+	return i.Valid() && i >= BCH
+}

@@ -23,6 +23,11 @@ func TestSqlite_Preferences(t *testing.T) {
 	PreferencesTests(t, context.Background(), resolver)
 }
 
+func TestSqlite_Projecting(t *testing.T) {
+	resolver := prepareSqlite(t, "projecting.test.db")
+	ProjectingTests(t, context.Background(), resolver)
+}
+
 func prepareSqlite(t *testing.T, dbFile string) *graph.Resolver {
 	if testing.Short() {
 		t.Skip("skipping e2e test in short mode")

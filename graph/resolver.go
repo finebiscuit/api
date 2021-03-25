@@ -10,6 +10,7 @@ import (
 	"github.com/finebiscuit/api/services/forex"
 	"github.com/finebiscuit/api/services/forex/dinero"
 	"github.com/finebiscuit/api/services/prefs"
+	"github.com/finebiscuit/api/services/projecting"
 )
 
 //go:generate go run github.com/99designs/gqlgen
@@ -19,9 +20,10 @@ import (
 // It serves as dependency injection for your app, add any dependencies you require here.
 
 type Resolver struct {
-	Accounting AccountingService
+	Accounting accounting.Service
 	Forex      forex.Service
-	Prefs      PreferencesService
+	Prefs      prefs.Service
+	Projecting projecting.Service
 }
 
 type Backend interface {
@@ -41,12 +43,14 @@ func NewResolver(cfg *config.Config, backends ...Backend) (*Resolver, error) {
 		return nil, err
 	}
 
-	prefsService := &prefs.Service{Tx: backend.PreferencesTxFn()}
-	accountingService := &accounting.Service{Tx: backend.AccountingTxFn()}
+	prefsSvc := prefs.NewService(backend.PreferencesTxFn())
+	accountingSvc := accounting.NewService(backend.AccountingTxFn())
+	projectingSvc := projecting.NewService(accountingSvc)
 	resolver := &Resolver{
 		Forex:      forex.NewService(dinero.New("", 2*time.Hour)),
-		Accounting: accountingService,
-		Prefs:      prefsService,
+		Accounting: accountingSvc,
+		Prefs:      prefsSvc,
+		Projecting: projectingSvc,
 	}
 	return resolver, nil
 }

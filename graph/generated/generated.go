@@ -9,10 +9,13 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
 	"github.com/finebiscuit/api/graph/model"
+	"github.com/finebiscuit/api/services/forex/currency"
+	"github.com/shopspring/decimal"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -45,14 +48,18 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	Balance struct {
-		AllCurrentValues func(childComplexity int) int
-		Currency         func(childComplexity int) int
-		CurrentValue     func(childComplexity int, currency string) int
-		DisplayName      func(childComplexity int) int
-		ID               func(childComplexity int) int
-		Institution      func(childComplexity int) int
-		Kind             func(childComplexity int) int
-		OfficialName     func(childComplexity int) int
+		AllCurrentValues            func(childComplexity int) int
+		Currency                    func(childComplexity int) int
+		CurrentValue                func(childComplexity int, currency currency.Currency) int
+		DisplayName                 func(childComplexity int) int
+		EstimatedMonthlyGrowthRate  func(childComplexity int) int
+		EstimatedMonthlyValueChange func(childComplexity int) int
+		HistoricalValues            func(childComplexity int, currency currency.Currency) int
+		ID                          func(childComplexity int) int
+		Institution                 func(childComplexity int) int
+		Kind                        func(childComplexity int) int
+		OfficialName                func(childComplexity int) int
+		ProjectedValues             func(childComplexity int, currency currency.Currency, forMonths int) int
 	}
 
 	BalancePayload struct {
@@ -61,7 +68,10 @@ type ComplexityRoot struct {
 
 	BalanceValue struct {
 		Currency func(childComplexity int) int
+		Month    func(childComplexity int) int
+		ValidAt  func(childComplexity int) int
 		Value    func(childComplexity int) int
+		Year     func(childComplexity int) int
 	}
 
 	Mutation struct {
@@ -94,7 +104,9 @@ type ComplexityRoot struct {
 
 type BalanceResolver interface {
 	AllCurrentValues(ctx context.Context, obj *model.Balance) ([]*model.BalanceValue, error)
-	CurrentValue(ctx context.Context, obj *model.Balance, currency string) (*model.BalanceValue, error)
+	CurrentValue(ctx context.Context, obj *model.Balance, currency currency.Currency) (*model.BalanceValue, error)
+	HistoricalValues(ctx context.Context, obj *model.Balance, currency currency.Currency) ([]*model.BalanceValue, error)
+	ProjectedValues(ctx context.Context, obj *model.Balance, currency currency.Currency, forMonths int) ([]*model.BalanceValue, error)
 }
 type MutationResolver interface {
 	UpdatePreferences(ctx context.Context, params model.UpdatePreferencesParams) (*model.PreferencesPayload, error)
@@ -148,7 +160,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Balance.CurrentValue(childComplexity, args["currency"].(string)), true
+		return e.complexity.Balance.CurrentValue(childComplexity, args["currency"].(currency.Currency)), true
 
 	case "Balance.displayName":
 		if e.complexity.Balance.DisplayName == nil {
@@ -156,6 +168,32 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Balance.DisplayName(childComplexity), true
+
+	case "Balance.estimatedMonthlyGrowthRate":
+		if e.complexity.Balance.EstimatedMonthlyGrowthRate == nil {
+			break
+		}
+
+		return e.complexity.Balance.EstimatedMonthlyGrowthRate(childComplexity), true
+
+	case "Balance.estimatedMonthlyValueChange":
+		if e.complexity.Balance.EstimatedMonthlyValueChange == nil {
+			break
+		}
+
+		return e.complexity.Balance.EstimatedMonthlyValueChange(childComplexity), true
+
+	case "Balance.historicalValues":
+		if e.complexity.Balance.HistoricalValues == nil {
+			break
+		}
+
+		args, err := ec.field_Balance_historicalValues_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Balance.HistoricalValues(childComplexity, args["currency"].(currency.Currency)), true
 
 	case "Balance.id":
 		if e.complexity.Balance.ID == nil {
@@ -185,6 +223,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Balance.OfficialName(childComplexity), true
 
+	case "Balance.projectedValues":
+		if e.complexity.Balance.ProjectedValues == nil {
+			break
+		}
+
+		args, err := ec.field_Balance_projectedValues_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Balance.ProjectedValues(childComplexity, args["currency"].(currency.Currency), args["forMonths"].(int)), true
+
 	case "BalancePayload.balance":
 		if e.complexity.BalancePayload.Balance == nil {
 			break
@@ -199,12 +249,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.BalanceValue.Currency(childComplexity), true
 
+	case "BalanceValue.month":
+		if e.complexity.BalanceValue.Month == nil {
+			break
+		}
+
+		return e.complexity.BalanceValue.Month(childComplexity), true
+
+	case "BalanceValue.validAt":
+		if e.complexity.BalanceValue.ValidAt == nil {
+			break
+		}
+
+		return e.complexity.BalanceValue.ValidAt(childComplexity), true
+
 	case "BalanceValue.value":
 		if e.complexity.BalanceValue.Value == nil {
 			break
 		}
 
 		return e.complexity.BalanceValue.Value(childComplexity), true
+
+	case "BalanceValue.year":
+		if e.complexity.BalanceValue.Year == nil {
+			break
+		}
+
+		return e.complexity.BalanceValue.Year(childComplexity), true
 
 	case "Mutation.createBalance":
 		if e.complexity.Mutation.CreateBalance == nil {
@@ -381,20 +452,28 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 var sources = []*ast.Source{
 	{Name: "graph/schema/accounting.graphqls", Input: `type Balance {
     id: ID!
-    currency: String!
+    currency: Currency!
     kind: String!
 
     displayName: String
     officialName: String
     institution: String
 
+    estimatedMonthlyGrowthRate: Decimal
+    estimatedMonthlyValueChange: Decimal
+
     allCurrentValues: [BalanceValue!]! @goField(forceResolver: true)
-    currentValue(currency: String! @goField(name: "cur")): BalanceValue
+    currentValue(currency: Currency!): BalanceValue
+
+    historicalValues(currency: Currency!): [BalanceValue!]
 }
 
 type BalanceValue {
-    currency: String!
-    value: String!
+    currency: Currency!
+    value: Decimal!
+    validAt: Time!
+    year: Int!
+    month: Int!
 }
 
 extend type Query {
@@ -402,12 +481,14 @@ extend type Query {
 }
 
 input CreateBalanceInput {
-    currency: String!
+    currency: Currency!
     kind: String!
-    value: String!
+    value: Decimal!
     displayName: String
     officialName: String
     institution: String
+    estimatedMonthlyGrowthRate: Decimal
+    estimatedMonthlyValueChange: Decimal
 }
 
 input UpdateBalanceInfoInput {
@@ -415,6 +496,8 @@ input UpdateBalanceInfoInput {
     displayName: String
     officialName: String
     institution: String
+    estimatedMonthlyGrowthRate: Decimal
+    estimatedMonthlyValueChange: Decimal
 }
 
 input UpdateBalanceValueInput {
@@ -434,6 +517,13 @@ extend type Mutation {
 }
 
 `, BuiltIn: false},
+	{Name: "graph/schema/forex.graphqls", Input: `scalar Currency
+scalar Decimal
+`, BuiltIn: false},
+	{Name: "graph/schema/projecting.graphqls", Input: `extend type Balance {
+    projectedValues(currency: Currency!, forMonths: Int!): [BalanceValue!]
+}
+`, BuiltIn: false},
 	{Name: "graph/schema/schema.graphqls", Input: `scalar Time
 directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
@@ -442,8 +532,8 @@ type Version {
 }
 
 type Preferences {
-  defaultCurrency: String
-  supportedCurrencies: [String!]
+  defaultCurrency: Currency
+  supportedCurrencies: [Currency!]
 }
 
 type Query {
@@ -452,8 +542,8 @@ type Query {
 }
 
 input UpdatePreferencesParams {
-  defaultCurrency: String
-  supportedCurrencies: [String!]
+  defaultCurrency: Currency
+  supportedCurrencies: [Currency!]
 }
 
 type PreferencesPayload {
@@ -473,15 +563,54 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 func (ec *executionContext) field_Balance_currentValue_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 currency.Currency
 	if tmp, ok := rawArgs["currency"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		arg0, err = ec.unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["currency"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Balance_historicalValues_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 currency.Currency
+	if tmp, ok := rawArgs["currency"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
+		arg0, err = ec.unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["currency"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Balance_projectedValues_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 currency.Currency
+	if tmp, ok := rawArgs["currency"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
+		arg0, err = ec.unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["currency"] = arg0
+	var arg1 int
+	if tmp, ok := rawArgs["forMonths"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forMonths"))
+		arg1, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["forMonths"] = arg1
 	return args, nil
 }
 
@@ -678,9 +807,9 @@ func (ec *executionContext) _Balance_currency(ctx context.Context, field graphql
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(currency.Currency)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Balance_kind(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
@@ -814,6 +943,70 @@ func (ec *executionContext) _Balance_institution(ctx context.Context, field grap
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Balance_estimatedMonthlyGrowthRate(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Balance",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EstimatedMonthlyGrowthRate, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(decimal.Decimal)
+	fc.Result = res
+	return ec.marshalODecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Balance_estimatedMonthlyValueChange(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Balance",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EstimatedMonthlyValueChange, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(decimal.Decimal)
+	fc.Result = res
+	return ec.marshalODecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Balance_allCurrentValues(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -874,7 +1067,7 @@ func (ec *executionContext) _Balance_currentValue(ctx context.Context, field gra
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Balance().CurrentValue(rctx, obj, args["currency"].(string))
+		return ec.resolvers.Balance().CurrentValue(rctx, obj, args["currency"].(currency.Currency))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -886,6 +1079,84 @@ func (ec *executionContext) _Balance_currentValue(ctx context.Context, field gra
 	res := resTmp.(*model.BalanceValue)
 	fc.Result = res
 	return ec.marshalOBalanceValue2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceValue(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Balance_historicalValues(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Balance",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Balance_historicalValues_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Balance().HistoricalValues(rctx, obj, args["currency"].(currency.Currency))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.BalanceValue)
+	fc.Result = res
+	return ec.marshalOBalanceValue2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceValueᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Balance_projectedValues(ctx context.Context, field graphql.CollectedField, obj *model.Balance) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Balance",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Balance_projectedValues_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Balance().ProjectedValues(rctx, obj, args["currency"].(currency.Currency), args["forMonths"].(int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.BalanceValue)
+	fc.Result = res
+	return ec.marshalOBalanceValue2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceValueᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _BalancePayload_balance(ctx context.Context, field graphql.CollectedField, obj *model.BalancePayload) (ret graphql.Marshaler) {
@@ -950,9 +1221,9 @@ func (ec *executionContext) _BalanceValue_currency(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(currency.Currency)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _BalanceValue_value(ctx context.Context, field graphql.CollectedField, obj *model.BalanceValue) (ret graphql.Marshaler) {
@@ -985,9 +1256,114 @@ func (ec *executionContext) _BalanceValue_value(ctx context.Context, field graph
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(decimal.Decimal)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNDecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _BalanceValue_validAt(ctx context.Context, field graphql.CollectedField, obj *model.BalanceValue) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "BalanceValue",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ValidAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _BalanceValue_year(ctx context.Context, field graphql.CollectedField, obj *model.BalanceValue) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "BalanceValue",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Year, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _BalanceValue_month(ctx context.Context, field graphql.CollectedField, obj *model.BalanceValue) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "BalanceValue",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Month, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_updatePreferences(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1212,9 +1588,9 @@ func (ec *executionContext) _Preferences_defaultCurrency(ctx context.Context, fi
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(*currency.Currency)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalOCurrency2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Preferences_supportedCurrencies(ctx context.Context, field graphql.CollectedField, obj *model.Preferences) (ret graphql.Marshaler) {
@@ -1244,9 +1620,9 @@ func (ec *executionContext) _Preferences_supportedCurrencies(ctx context.Context
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]string)
+	res := resTmp.([]currency.Currency)
 	fc.Result = res
-	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+	return ec.marshalOCurrency2ᚕgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrencyᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _PreferencesPayload_preferences(ctx context.Context, field graphql.CollectedField, obj *model.PreferencesPayload) (ret graphql.Marshaler) {
@@ -2583,7 +2959,7 @@ func (ec *executionContext) unmarshalInputCreateBalanceInput(ctx context.Context
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
-			it.Currency, err = ec.unmarshalNString2string(ctx, v)
+			it.Currency, err = ec.unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2599,7 +2975,7 @@ func (ec *executionContext) unmarshalInputCreateBalanceInput(ctx context.Context
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("value"))
-			it.Value, err = ec.unmarshalNString2string(ctx, v)
+			it.Value, err = ec.unmarshalNDecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2624,6 +3000,22 @@ func (ec *executionContext) unmarshalInputCreateBalanceInput(ctx context.Context
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("institution"))
 			it.Institution, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "estimatedMonthlyGrowthRate":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("estimatedMonthlyGrowthRate"))
+			it.EstimatedMonthlyGrowthRate, err = ec.unmarshalODecimal2ᚖgithubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "estimatedMonthlyValueChange":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("estimatedMonthlyValueChange"))
+			it.EstimatedMonthlyValueChange, err = ec.unmarshalODecimal2ᚖgithubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2671,6 +3063,22 @@ func (ec *executionContext) unmarshalInputUpdateBalanceInfoInput(ctx context.Con
 			if err != nil {
 				return it, err
 			}
+		case "estimatedMonthlyGrowthRate":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("estimatedMonthlyGrowthRate"))
+			it.EstimatedMonthlyGrowthRate, err = ec.unmarshalODecimal2ᚖgithubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "estimatedMonthlyValueChange":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("estimatedMonthlyValueChange"))
+			it.EstimatedMonthlyValueChange, err = ec.unmarshalODecimal2ᚖgithubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, v)
+			if err != nil {
+				return it, err
+			}
 		}
 	}
 
@@ -2715,7 +3123,7 @@ func (ec *executionContext) unmarshalInputUpdatePreferencesParams(ctx context.Co
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("defaultCurrency"))
-			it.DefaultCurrency, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			it.DefaultCurrency, err = ec.unmarshalOCurrency2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2723,7 +3131,7 @@ func (ec *executionContext) unmarshalInputUpdatePreferencesParams(ctx context.Co
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("supportedCurrencies"))
-			it.SupportedCurrencies, err = ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			it.SupportedCurrencies, err = ec.unmarshalOCurrency2ᚕgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrencyᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2773,6 +3181,10 @@ func (ec *executionContext) _Balance(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = ec._Balance_officialName(ctx, field, obj)
 		case "institution":
 			out.Values[i] = ec._Balance_institution(ctx, field, obj)
+		case "estimatedMonthlyGrowthRate":
+			out.Values[i] = ec._Balance_estimatedMonthlyGrowthRate(ctx, field, obj)
+		case "estimatedMonthlyValueChange":
+			out.Values[i] = ec._Balance_estimatedMonthlyValueChange(ctx, field, obj)
 		case "allCurrentValues":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -2796,6 +3208,28 @@ func (ec *executionContext) _Balance(ctx context.Context, sel ast.SelectionSet, 
 					}
 				}()
 				res = ec._Balance_currentValue(ctx, field, obj)
+				return res
+			})
+		case "historicalValues":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Balance_historicalValues(ctx, field, obj)
+				return res
+			})
+		case "projectedValues":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Balance_projectedValues(ctx, field, obj)
 				return res
 			})
 		default:
@@ -2851,6 +3285,21 @@ func (ec *executionContext) _BalanceValue(ctx context.Context, sel ast.Selection
 			}
 		case "value":
 			out.Values[i] = ec._BalanceValue_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "validAt":
+			out.Values[i] = ec._BalanceValue_validAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "year":
+			out.Values[i] = ec._BalanceValue_year(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "month":
+			out.Values[i] = ec._BalanceValue_month(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -3366,6 +3815,31 @@ func (ec *executionContext) unmarshalNCreateBalanceInput2githubᚗcomᚋfinebisc
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx context.Context, v interface{}) (currency.Currency, error) {
+	var res currency.Currency
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx context.Context, sel ast.SelectionSet, v currency.Currency) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNDecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx context.Context, v interface{}) (decimal.Decimal, error) {
+	res, err := model.UnmarshalDecimal(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNDecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx context.Context, sel ast.SelectionSet, v decimal.Decimal) graphql.Marshaler {
+	res := model.MarshalDecimal(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -3381,6 +3855,21 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 	return res
 }
 
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -3388,6 +3877,21 @@ func (ec *executionContext) unmarshalNString2string(ctx context.Context, v inter
 
 func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
+	res, err := graphql.UnmarshalTime(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
+	res := graphql.MarshalTime(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -3708,6 +4212,46 @@ func (ec *executionContext) marshalOBalancePayload2ᚖgithubᚗcomᚋfinebiscuit
 	return ec._BalancePayload(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOBalanceValue2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceValueᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.BalanceValue) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNBalanceValue2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceValue(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
 func (ec *executionContext) marshalOBalanceValue2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceValue(ctx context.Context, sel ast.SelectionSet, v *model.BalanceValue) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -3739,6 +4283,82 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return graphql.MarshalBoolean(*v)
 }
 
+func (ec *executionContext) unmarshalOCurrency2ᚕgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrencyᚄ(ctx context.Context, v interface{}) ([]currency.Currency, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		if tmp1, ok := v.([]interface{}); ok {
+			vSlice = tmp1
+		} else {
+			vSlice = []interface{}{v}
+		}
+	}
+	var err error
+	res := make([]currency.Currency, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOCurrency2ᚕgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrencyᚄ(ctx context.Context, sel ast.SelectionSet, v []currency.Currency) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, sel, v[i])
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalOCurrency2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx context.Context, v interface{}) (*currency.Currency, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(currency.Currency)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOCurrency2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx context.Context, sel ast.SelectionSet, v *currency.Currency) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalODecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx context.Context, v interface{}) (decimal.Decimal, error) {
+	res, err := model.UnmarshalDecimal(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalODecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx context.Context, sel ast.SelectionSet, v decimal.Decimal) graphql.Marshaler {
+	return model.MarshalDecimal(v)
+}
+
+func (ec *executionContext) unmarshalODecimal2ᚖgithubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx context.Context, v interface{}) (*decimal.Decimal, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := model.UnmarshalDecimal(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalODecimal2ᚖgithubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx context.Context, sel ast.SelectionSet, v *decimal.Decimal) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return model.MarshalDecimal(*v)
+}
+
 func (ec *executionContext) marshalOPreferences2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐPreferences(ctx context.Context, sel ast.SelectionSet, v *model.Preferences) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -3760,42 +4380,6 @@ func (ec *executionContext) unmarshalOString2string(ctx context.Context, v inter
 
 func (ec *executionContext) marshalOString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	return graphql.MarshalString(v)
-}
-
-func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		if tmp1, ok := v.([]interface{}); ok {
-			vSlice = tmp1
-		} else {
-			vSlice = []interface{}{v}
-		}
-	}
-	var err error
-	res := make([]string, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalOString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
-	}
-
-	return ret
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v interface{}) (*string, error) {

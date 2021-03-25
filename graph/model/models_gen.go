@@ -2,22 +2,34 @@
 
 package model
 
+import (
+	"time"
+
+	"github.com/finebiscuit/api/services/forex/currency"
+	"github.com/shopspring/decimal"
+)
+
 type BalancePayload struct {
 	Balance *Balance `json:"balance"`
 }
 
 type BalanceValue struct {
-	Currency string `json:"currency"`
-	Value    string `json:"value"`
+	Currency currency.Currency `json:"currency"`
+	Value    decimal.Decimal   `json:"value"`
+	ValidAt  time.Time         `json:"validAt"`
+	Year     int               `json:"year"`
+	Month    int               `json:"month"`
 }
 
 type CreateBalanceInput struct {
-	Currency     string  `json:"currency"`
-	Kind         string  `json:"kind"`
-	Value        string  `json:"value"`
-	DisplayName  *string `json:"displayName"`
-	OfficialName *string `json:"officialName"`
-	Institution  *string `json:"institution"`
+	Currency                    currency.Currency `json:"currency"`
+	Kind                        string            `json:"kind"`
+	Value                       decimal.Decimal   `json:"value"`
+	DisplayName                 *string           `json:"displayName"`
+	OfficialName                *string           `json:"officialName"`
+	Institution                 *string           `json:"institution"`
+	EstimatedMonthlyGrowthRate  *decimal.Decimal  `json:"estimatedMonthlyGrowthRate"`
+	EstimatedMonthlyValueChange *decimal.Decimal  `json:"estimatedMonthlyValueChange"`
 }
 
 type PreferencesPayload struct {
@@ -25,10 +37,12 @@ type PreferencesPayload struct {
 }
 
 type UpdateBalanceInfoInput struct {
-	BalanceID    string  `json:"balanceId"`
-	DisplayName  *string `json:"displayName"`
-	OfficialName *string `json:"officialName"`
-	Institution  *string `json:"institution"`
+	BalanceID                   string           `json:"balanceId"`
+	DisplayName                 *string          `json:"displayName"`
+	OfficialName                *string          `json:"officialName"`
+	Institution                 *string          `json:"institution"`
+	EstimatedMonthlyGrowthRate  *decimal.Decimal `json:"estimatedMonthlyGrowthRate"`
+	EstimatedMonthlyValueChange *decimal.Decimal `json:"estimatedMonthlyValueChange"`
 }
 
 type UpdateBalanceValueInput struct {
@@ -37,8 +51,8 @@ type UpdateBalanceValueInput struct {
 }
 
 type UpdatePreferencesParams struct {
-	DefaultCurrency     *string  `json:"defaultCurrency"`
-	SupportedCurrencies []string `json:"supportedCurrencies"`
+	DefaultCurrency     *currency.Currency  `json:"defaultCurrency"`
+	SupportedCurrencies []currency.Currency `json:"supportedCurrencies"`
 }
 
 type Version struct {

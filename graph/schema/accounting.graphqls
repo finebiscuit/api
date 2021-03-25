@@ -1,19 +1,27 @@
 type Balance {
     id: ID!
-    currency: String!
+    currency: Currency!
     kind: String!
 
     displayName: String
     officialName: String
     institution: String
 
+    estimatedMonthlyGrowthRate: Decimal
+    estimatedMonthlyValueChange: Decimal
+
     allCurrentValues: [BalanceValue!]! @goField(forceResolver: true)
-    currentValue(currency: String!): BalanceValue
+    currentValue(currency: Currency!): BalanceValue
+
+    historicalValues(currency: Currency!): [BalanceValue!]
 }
 
 type BalanceValue {
-    currency: String!
-    value: String!
+    currency: Currency!
+    value: Decimal!
+    validAt: Time!
+    year: Int!
+    month: Int!
 }
 
 extend type Query {
@@ -21,12 +29,14 @@ extend type Query {
 }
 
 input CreateBalanceInput {
-    currency: String!
+    currency: Currency!
     kind: String!
-    value: String!
+    value: Decimal!
     displayName: String
     officialName: String
     institution: String
+    estimatedMonthlyGrowthRate: Decimal
+    estimatedMonthlyValueChange: Decimal
 }
 
 input UpdateBalanceInfoInput {
@@ -34,6 +44,8 @@ input UpdateBalanceInfoInput {
     displayName: String
     officialName: String
     institution: String
+    estimatedMonthlyGrowthRate: Decimal
+    estimatedMonthlyValueChange: Decimal
 }
 
 input UpdateBalanceValueInput {

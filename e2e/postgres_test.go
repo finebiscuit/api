@@ -26,6 +26,11 @@ func TestPostgres_Preferences(t *testing.T) {
 	PreferencesTests(t, context.Background(), resolver)
 }
 
+func TestPostgres_Projecting(t *testing.T) {
+	resolver := preparePostgres(t, "test_projecting")
+	ProjectingTests(t, context.Background(), resolver)
+}
+
 func postgresDSN(dbname string) string {
 	return fmt.Sprintf("host=postgres port=5432 user=finebiscuit dbname=%s password=finebiscuit sslmode=disable", dbname)
 }
