@@ -117,7 +117,7 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 		t.Run("Success", func(t *testing.T) {
 			res, err := resolver.Mutation().UpdateBalanceValue(ctx, model.UpdateBalanceValueInput{
 				BalanceID: bal.ID,
-				Value:     "234.56",
+				Value:     decimal.RequireFromString("234.56"),
 			})
 			require.NoError(t, err)
 			require.NotNil(t, res.Balance)
@@ -131,7 +131,7 @@ func AccountingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 		require.Len(t, res, 1)
 
 		assert.Equal(t, currency.EUR, res[0].Currency)
-		assert.Equal(t, "234.56", res[0].Value)
+		assert.True(t, decimal.RequireFromString("234.56").Equal(res[0].Value))
 	})
 }
 

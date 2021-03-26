@@ -50,7 +50,7 @@ input UpdateBalanceInfoInput {
 
 input UpdateBalanceValueInput {
     balanceId: ID!
-    value: String!
+    value: Decimal!
 }
 
 type BalancePayload {

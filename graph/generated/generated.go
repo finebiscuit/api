@@ -502,7 +502,7 @@ input UpdateBalanceInfoInput {
 
 input UpdateBalanceValueInput {
     balanceId: ID!
-    value: String!
+    value: Decimal!
 }
 
 type BalancePayload {
@@ -3103,7 +3103,7 @@ func (ec *executionContext) unmarshalInputUpdateBalanceValueInput(ctx context.Co
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("value"))
-			it.Value, err = ec.unmarshalNString2string(ctx, v)
+			it.Value, err = ec.unmarshalNDecimal2githubᚗcomᚋshopspringᚋdecimalᚐDecimal(ctx, v)
 			if err != nil {
 				return it, err
 			}

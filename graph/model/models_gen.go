@@ -46,8 +46,8 @@ type UpdateBalanceInfoInput struct {
 }
 
 type UpdateBalanceValueInput struct {
-	BalanceID string `json:"balanceId"`
-	Value     string `json:"value"`
+	BalanceID string          `json:"balanceId"`
+	Value     decimal.Decimal `json:"value"`
 }
 
 type UpdatePreferencesParams struct {

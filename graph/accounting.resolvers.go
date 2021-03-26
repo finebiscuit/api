@@ -11,7 +11,6 @@ import (
 	"github.com/finebiscuit/api/graph/model"
 	"github.com/finebiscuit/api/services/accounting/balance"
 	forexcurrency "github.com/finebiscuit/api/services/forex/currency"
-	"github.com/shopspring/decimal"
 )
 
 func (r *balanceResolver) AllCurrentValues(ctx context.Context, obj *model.Balance) ([]*model.BalanceValue, error) {
@@ -126,12 +125,7 @@ func (r *mutationResolver) UpdateBalanceValue(ctx context.Context, params model.
 		return nil, err
 	}
 
-	decVal, err := decimal.NewFromString(params.Value)
-	if err != nil {
-		return nil, fmt.Errorf("invalid value: %q", params.Value)
-	}
-
-	values, err := r.Accounting.UpdateBalanceValue(ctx, b.ID, decVal)
+	values, err := r.Accounting.UpdateBalanceValue(ctx, b.ID, params.Value)
 	if err != nil {
 		return nil, err
 	}
