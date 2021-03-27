@@ -18,24 +18,19 @@ func (r *balanceResolver) ProjectedValues(ctx context.Context, obj *model.Balanc
 	since := util.NewPeriodFromTime(time.Now())
 	until := util.NewPeriodFromTime(time.Now().AddDate(0, forMonths, 0))
 
-	p, err := r.Prefs.GetPreferences(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	c := p.DefaultCurrency
+	var c forexcurrency.Currency
 	if currency != nil {
 		c = *currency
 	}
 
-	valMap, err := r.Projecting.ProjectBalanceValue(ctx, balanceID, c, since, until)
+	valMap, actualCur, err := r.Projecting.ProjectBalanceValue(ctx, balanceID, c, since, until)
 	if err != nil {
 		return nil, err
 	}
 
 	values := make([]*model.BalanceValue, 0, len(valMap))
 	for current := since.Next(); current != until.Next(); current = current.Next() {
-		values = append(values, model.NewBalanceValue(c, valMap[current], current.Time()))
+		values = append(values, model.NewBalanceValue(actualCur, valMap[current], current.Time()))
 	}
 	return values, nil
 }
