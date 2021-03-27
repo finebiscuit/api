@@ -13,7 +13,7 @@ type Balance {
     allCurrentValues: [BalanceValue!]! @goField(forceResolver: true)
     currentValue(currency: Currency!): BalanceValue
 
-    historicalValues(currency: Currency!): [BalanceValue!]
+    historicalValues(currency: Currency): [BalanceValue!]
 }
 
 type BalanceValue {
@@ -26,6 +26,7 @@ type BalanceValue {
 
 extend type Query {
     balances: [Balance!]
+    balance(id: ID!): Balance
 }
 
 input CreateBalanceInput {

@@ -9,23 +9,33 @@ import (
 
 	"github.com/finebiscuit/api/graph/model"
 	"github.com/finebiscuit/api/services/accounting/balance"
-	"github.com/finebiscuit/api/services/forex/currency"
+	forexcurrency "github.com/finebiscuit/api/services/forex/currency"
 	"github.com/finebiscuit/api/util"
 )
 
-func (r *balanceResolver) ProjectedValues(ctx context.Context, obj *model.Balance, currency currency.Currency, forMonths int) ([]*model.BalanceValue, error) {
+func (r *balanceResolver) ProjectedValues(ctx context.Context, obj *model.Balance, forMonths int, currency *forexcurrency.Currency) ([]*model.BalanceValue, error) {
 	balanceID := balance.ParseID(obj.ID)
 	since := util.NewPeriodFromTime(time.Now())
 	until := util.NewPeriodFromTime(time.Now().AddDate(0, forMonths, 0))
 
-	valMap, err := r.Projecting.ProjectBalanceValue(ctx, balanceID, currency, since, until)
+	p, err := r.Prefs.GetPreferences(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	c := p.DefaultCurrency
+	if currency != nil {
+		c = *currency
+	}
+
+	valMap, err := r.Projecting.ProjectBalanceValue(ctx, balanceID, c, since, until)
 	if err != nil {
 		return nil, err
 	}
 
 	values := make([]*model.BalanceValue, 0, len(valMap))
 	for current := since.Next(); current != until.Next(); current = current.Next() {
-		values = append(values, model.NewBalanceValue(currency, valMap[current], current.Time()))
+		values = append(values, model.NewBalanceValue(c, valMap[current], current.Time()))
 	}
 	return values, nil
 }

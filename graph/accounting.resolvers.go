@@ -35,7 +35,7 @@ func (r *balanceResolver) CurrentValue(ctx context.Context, obj *model.Balance, 
 	return model.NewBalanceValue(currency, v, obj.ValidAt), nil
 }
 
-func (r *balanceResolver) HistoricalValues(ctx context.Context, obj *model.Balance, currency forexcurrency.Currency) ([]*model.BalanceValue, error) {
+func (r *balanceResolver) HistoricalValues(ctx context.Context, obj *model.Balance, currency *forexcurrency.Currency) ([]*model.BalanceValue, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
@@ -151,6 +151,14 @@ func (r *queryResolver) Balances(ctx context.Context) ([]*model.Balance, error) 
 	}
 
 	return mbs, nil
+}
+
+func (r *queryResolver) Balance(ctx context.Context, id string) (*model.Balance, error) {
+	b, err := r.Accounting.GetBalanceWithCurrentValue(ctx, balance.ParseID(id))
+	if err != nil {
+		return nil, err
+	}
+	return model.NewBalance(b), nil
 }
 
 // Balance returns generated.BalanceResolver implementation.

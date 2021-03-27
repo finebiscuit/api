@@ -54,12 +54,12 @@ type ComplexityRoot struct {
 		DisplayName                 func(childComplexity int) int
 		EstimatedMonthlyGrowthRate  func(childComplexity int) int
 		EstimatedMonthlyValueChange func(childComplexity int) int
-		HistoricalValues            func(childComplexity int, currency currency.Currency) int
+		HistoricalValues            func(childComplexity int, currency *currency.Currency) int
 		ID                          func(childComplexity int) int
 		Institution                 func(childComplexity int) int
 		Kind                        func(childComplexity int) int
 		OfficialName                func(childComplexity int) int
-		ProjectedValues             func(childComplexity int, currency currency.Currency, forMonths int) int
+		ProjectedValues             func(childComplexity int, forMonths int, currency *currency.Currency) int
 	}
 
 	BalancePayload struct {
@@ -92,6 +92,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		Balance     func(childComplexity int, id string) int
 		Balances    func(childComplexity int) int
 		Preferences func(childComplexity int) int
 		Version     func(childComplexity int) int
@@ -105,8 +106,8 @@ type ComplexityRoot struct {
 type BalanceResolver interface {
 	AllCurrentValues(ctx context.Context, obj *model.Balance) ([]*model.BalanceValue, error)
 	CurrentValue(ctx context.Context, obj *model.Balance, currency currency.Currency) (*model.BalanceValue, error)
-	HistoricalValues(ctx context.Context, obj *model.Balance, currency currency.Currency) ([]*model.BalanceValue, error)
-	ProjectedValues(ctx context.Context, obj *model.Balance, currency currency.Currency, forMonths int) ([]*model.BalanceValue, error)
+	HistoricalValues(ctx context.Context, obj *model.Balance, currency *currency.Currency) ([]*model.BalanceValue, error)
+	ProjectedValues(ctx context.Context, obj *model.Balance, forMonths int, currency *currency.Currency) ([]*model.BalanceValue, error)
 }
 type MutationResolver interface {
 	UpdatePreferences(ctx context.Context, params model.UpdatePreferencesParams) (*model.PreferencesPayload, error)
@@ -119,6 +120,7 @@ type QueryResolver interface {
 	Version(ctx context.Context) (*model.Version, error)
 	Preferences(ctx context.Context) (*model.Preferences, error)
 	Balances(ctx context.Context) ([]*model.Balance, error)
+	Balance(ctx context.Context, id string) (*model.Balance, error)
 }
 
 type executableSchema struct {
@@ -193,7 +195,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Balance.HistoricalValues(childComplexity, args["currency"].(currency.Currency)), true
+		return e.complexity.Balance.HistoricalValues(childComplexity, args["currency"].(*currency.Currency)), true
 
 	case "Balance.id":
 		if e.complexity.Balance.ID == nil {
@@ -233,7 +235,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Balance.ProjectedValues(childComplexity, args["currency"].(currency.Currency), args["forMonths"].(int)), true
+		return e.complexity.Balance.ProjectedValues(childComplexity, args["forMonths"].(int), args["currency"].(*currency.Currency)), true
 
 	case "BalancePayload.balance":
 		if e.complexity.BalancePayload.Balance == nil {
@@ -358,6 +360,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreferencesPayload.Preferences(childComplexity), true
 
+	case "Query.balance":
+		if e.complexity.Query.Balance == nil {
+			break
+		}
+
+		args, err := ec.field_Query_balance_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Balance(childComplexity, args["id"].(string)), true
+
 	case "Query.balances":
 		if e.complexity.Query.Balances == nil {
 			break
@@ -465,7 +479,7 @@ var sources = []*ast.Source{
     allCurrentValues: [BalanceValue!]! @goField(forceResolver: true)
     currentValue(currency: Currency!): BalanceValue
 
-    historicalValues(currency: Currency!): [BalanceValue!]
+    historicalValues(currency: Currency): [BalanceValue!]
 }
 
 type BalanceValue {
@@ -478,6 +492,7 @@ type BalanceValue {
 
 extend type Query {
     balances: [Balance!]
+    balance(id: ID!): Balance
 }
 
 input CreateBalanceInput {
@@ -521,7 +536,7 @@ extend type Mutation {
 scalar Decimal
 `, BuiltIn: false},
 	{Name: "graph/schema/projecting.graphqls", Input: `extend type Balance {
-    projectedValues(currency: Currency!, forMonths: Int!): [BalanceValue!]
+    projectedValues(forMonths: Int!, currency: Currency): [BalanceValue!]
 }
 `, BuiltIn: false},
 	{Name: "graph/schema/schema.graphqls", Input: `scalar Time
@@ -578,10 +593,10 @@ func (ec *executionContext) field_Balance_currentValue_args(ctx context.Context,
 func (ec *executionContext) field_Balance_historicalValues_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 currency.Currency
+	var arg0 *currency.Currency
 	if tmp, ok := rawArgs["currency"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
-		arg0, err = ec.unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, tmp)
+		arg0, err = ec.unmarshalOCurrency2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -593,24 +608,24 @@ func (ec *executionContext) field_Balance_historicalValues_args(ctx context.Cont
 func (ec *executionContext) field_Balance_projectedValues_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 currency.Currency
-	if tmp, ok := rawArgs["currency"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
-		arg0, err = ec.unmarshalNCurrency2githubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["currency"] = arg0
-	var arg1 int
+	var arg0 int
 	if tmp, ok := rawArgs["forMonths"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forMonths"))
-		arg1, err = ec.unmarshalNInt2int(ctx, tmp)
+		arg0, err = ec.unmarshalNInt2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["forMonths"] = arg1
+	args["forMonths"] = arg0
+	var arg1 *currency.Currency
+	if tmp, ok := rawArgs["currency"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currency"))
+		arg1, err = ec.unmarshalOCurrency2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋservicesᚋforexᚋcurrencyᚐCurrency(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["currency"] = arg1
 	return args, nil
 }
 
@@ -701,6 +716,21 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_balance_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -1106,7 +1136,7 @@ func (ec *executionContext) _Balance_historicalValues(ctx context.Context, field
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Balance().HistoricalValues(rctx, obj, args["currency"].(currency.Currency))
+		return ec.resolvers.Balance().HistoricalValues(rctx, obj, args["currency"].(*currency.Currency))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1145,7 +1175,7 @@ func (ec *executionContext) _Balance_projectedValues(ctx context.Context, field 
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Balance().ProjectedValues(rctx, obj, args["currency"].(currency.Currency), args["forMonths"].(int))
+		return ec.resolvers.Balance().ProjectedValues(rctx, obj, args["forMonths"].(int), args["currency"].(*currency.Currency))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1754,6 +1784,45 @@ func (ec *executionContext) _Query_balances(ctx context.Context, field graphql.C
 	res := resTmp.([]*model.Balance)
 	fc.Result = res
 	return ec.marshalOBalance2ᚕᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalanceᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_balance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_balance_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Balance(rctx, args["id"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Balance)
+	fc.Result = res
+	return ec.marshalOBalance2ᚖgithubᚗcomᚋfinebiscuitᚋapiᚋgraphᚋmodelᚐBalance(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -3449,6 +3518,17 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_balances(ctx, field)
+				return res
+			})
+		case "balance":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_balance(ctx, field)
 				return res
 			})
 		case "__type":

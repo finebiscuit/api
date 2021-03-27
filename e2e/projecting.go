@@ -32,8 +32,9 @@ func ProjectingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 	bwcv := &balance.WithCurrentValue{Balance: *b, CurrentValue: valMap, ValidAt: time.Now()}
 
 	t.Run("Balance_ProjectedValues", func(t *testing.T) {
+		c := currency.EUR
 		year, month, _ := time.Now().AddDate(0, 1, 0).Date()
-		values, err := resolver.Balance().ProjectedValues(ctx, model.NewBalance(bwcv), currency.EUR, 6)
+		values, err := resolver.Balance().ProjectedValues(ctx, model.NewBalance(bwcv), 6, &c)
 		require.NoError(t, err)
 
 		since := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
