@@ -22,10 +22,15 @@ func (r *balanceResolver) AllCurrentValues(ctx context.Context, obj *model.Balan
 }
 
 func (r *balanceResolver) CurrentValue(ctx context.Context, obj *model.Balance, currency forexcurrency.Currency) (*model.BalanceValue, error) {
-	// TODO: in case there's no value for this currency, use the forex service to dynamically calculate it.
 	v, ok := obj.CurrentValues[currency]
 	if !ok {
-		return nil, fmt.Errorf("no value found for currency %q", currency)
+		v := obj.CurrentValues[obj.Currency]
+		rate, err := r.Forex.GetRate(ctx, obj.Currency, currency)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch exchange rate for currency pair %s-%s", obj.Currency, currency)
+		}
+		// TODO: fetch historical forex rate at the time of obj.ValidAt
+		return model.NewBalanceValue(currency, v.Mul(rate), obj.ValidAt), nil
 	}
 
 	return model.NewBalanceValue(currency, v, obj.ValidAt), nil
