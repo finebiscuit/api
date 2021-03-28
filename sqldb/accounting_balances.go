@@ -3,6 +3,7 @@ package sqldb
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/finebiscuit/api/services/accounting/entry"
 	"github.com/finebiscuit/api/services/forex/currency"
@@ -104,14 +105,17 @@ func (r *accountingBalancesRepository) GetWithCurrentValue(ctx context.Context, 
 		return nil, err
 	}
 
+	var validAt time.Time
 	valMap := make(map[currency.Currency]decimal.Decimal)
 	for cur, e := range m[id] {
 		valMap[cur] = e.Value
+		validAt = e.ValidAt
 	}
 
 	bwcv := &balance.WithCurrentValue{
 		Balance:      *b,
 		CurrentValue: valMap,
+		ValidAt:      validAt,
 	}
 	return bwcv, nil
 }
@@ -149,14 +153,17 @@ func (r *accountingBalancesRepository) ListWithCurrentValue(ctx context.Context,
 
 	bwcvs := make([]*balance.WithCurrentValue, 0, len(bs))
 	for _, b := range bs {
+		var validAt time.Time
 		valMap := make(map[currency.Currency]decimal.Decimal)
 		for cur, e := range m[b.ID] {
 			valMap[cur] = e.Value
+			validAt = e.ValidAt
 		}
 
 		bwcvs = append(bwcvs, &balance.WithCurrentValue{
 			Balance:      *b,
 			CurrentValue: valMap,
+			ValidAt:      validAt,
 		})
 	}
 	return bwcvs, nil

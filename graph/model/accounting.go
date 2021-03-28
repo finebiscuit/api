@@ -45,5 +45,7 @@ func NewBalanceValue(cur currency.Currency, value decimal.Decimal, validAt time.
 		Currency: cur,
 		Value:    value,
 		ValidAt:  validAt,
+		Year:     validAt.Year(),
+		Month:    int(validAt.Month()),
 	}
 }

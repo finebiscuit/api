@@ -16,11 +16,7 @@ import (
 func (r *balanceResolver) AllCurrentValues(ctx context.Context, obj *model.Balance) ([]*model.BalanceValue, error) {
 	mvals := make([]*model.BalanceValue, 0, len(obj.CurrentValues))
 	for k, v := range obj.CurrentValues {
-		mvals = append(mvals, &model.BalanceValue{
-			Currency: k,
-			Value:    v,
-			ValidAt:  obj.ValidAt,
-		})
+		mvals = append(mvals, model.NewBalanceValue(k, v, obj.ValidAt))
 	}
 	return mvals, nil
 }

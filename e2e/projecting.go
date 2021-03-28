@@ -37,37 +37,53 @@ func ProjectingTests(t *testing.T, ctx context.Context, resolver *graph.Resolver
 		values, err := resolver.Balance().ProjectedValues(ctx, model.NewBalance(bwcv), 6, &c)
 		require.NoError(t, err)
 
-		since := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+		dates := make([]time.Time, 6)
+		dates[0] = time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+		for i := 1; i < 6; i++ {
+			dates[i] = dates[i-1].AddDate(0, 1, 0)
+		}
 		expected := []*model.BalanceValue{
 			{
 				Currency: currency.EUR,
 				Value:    decimal.NewFromFloat(202), // 100 * 1.02 + 100
-				ValidAt:  since,
+				ValidAt:  dates[0],
+				Year:     dates[0].Year(),
+				Month:    int(dates[0].Month()),
 			},
 			{
 				Currency: currency.EUR,
 				Value:    decimal.NewFromFloat(306.04), // 202 * 1.02 + 100
-				ValidAt:  since.AddDate(0, 1, 0),
+				ValidAt:  dates[1],
+				Year:     dates[1].Year(),
+				Month:    int(dates[1].Month()),
 			},
 			{
 				Currency: currency.EUR,
 				Value:    decimal.NewFromFloat(412.16), // 306.04 * 1.02 + 100
-				ValidAt:  since.AddDate(0, 2, 0),
+				ValidAt:  dates[2],
+				Year:     dates[2].Year(),
+				Month:    int(dates[2].Month()),
 			},
 			{
 				Currency: currency.EUR,
 				Value:    decimal.NewFromFloat(520.4), // 412.16 * 1.02 + 100
-				ValidAt:  since.AddDate(0, 3, 0),
+				ValidAt:  dates[3],
+				Year:     dates[3].Year(),
+				Month:    int(dates[3].Month()),
 			},
 			{
 				Currency: currency.EUR,
 				Value:    decimal.NewFromFloat(630.81), // 520.4 * 1.02 + 100
-				ValidAt:  since.AddDate(0, 4, 0),
+				ValidAt:  dates[4],
+				Year:     dates[4].Year(),
+				Month:    int(dates[4].Month()),
 			},
 			{
 				Currency: currency.EUR,
 				Value:    decimal.NewFromFloat(743.43), // 630.81 * 1.02 + 100
-				ValidAt:  since.AddDate(0, 5, 0),
+				ValidAt:  dates[5],
+				Year:     dates[5].Year(),
+				Month:    int(dates[5].Month()),
 			},
 		}
 
